@@ -357,3 +357,23 @@ vite.config.ts.*
 
 /test-data
 /config.json
+
+vendor/
+
+# BRAW SDK and Development Data
+.data/
+*.braw
+*.raw
+crates/braw/bindings.rs
+crates/braw/libs/
+BlackmagicRAW_SDK/
+blackmagic-raw-sdk/
+# Dynamic libraries
+*.dylib
+*.dll
+*.so
+*.a
+*.lib
+# BRAW specific temporary files
+.braw_cache/
+*.braw.tmp

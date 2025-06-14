@@ -11,9 +11,11 @@ edition = "2021"
 
 [features]
 ffmpeg = ["dep:sd-ffmpeg"]
+braw = ["dep:sd-braw"]
 
 [dependencies]
 # Spacedrive Sub-crates
+sd-braw   = { path = "../braw", optional = true }
 sd-ffmpeg = { path = "../ffmpeg", optional = true }
 sd-utils  = { path = "../utils" }
 

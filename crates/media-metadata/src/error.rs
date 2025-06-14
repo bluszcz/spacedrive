@@ -10,6 +10,12 @@ pub enum Error {
 	#[cfg(not(feature = "ffmpeg"))]
 	#[error("ffmpeg not available")]
 	NoFFmpeg,
+	#[cfg(feature = "braw")]
+	#[error("error from the braw crate: {0}")]
+	BrawError(String),
+	#[cfg(not(feature = "braw"))]
+	#[error("braw not available")]
+	NoBraw,
 	#[error("there was an error while parsing time with chrono: {0}")]
 	Chrono(#[from] chrono::ParseError),
 	#[error("there was an error while converting between types")]

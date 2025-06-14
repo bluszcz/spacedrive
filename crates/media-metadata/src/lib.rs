@@ -32,7 +32,11 @@
 mod error;
 pub mod exif;
 pub mod ffmpeg;
+#[cfg(feature = "braw")]
+pub mod braw;
 
 pub use error::{Error, Result};
 pub use exif::ExifMetadata;
 pub use ffmpeg::FFmpegMetadata;
+#[cfg(feature = "braw")]
+pub use braw::BrawMediaMetadata;

@@ -1,0 +1,27 @@
+[package]
+name = "sd-braw"
+version = "0.1.0"
+description = "BlackmagicRAW support for Spacedrive"
+authors = ["Spacedrive Technology Inc."]
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+image = { workspace = true }
+tokio = { workspace = true, features = ["fs", "rt-multi-thread", "io-util"] }
+libc = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+specta = { workspace = true, features = ["serde"] }
+chrono = { workspace = true, features = ["serde"] }
+
+[build-dependencies]
+bindgen = "0.69"
+
+[features]
+default = []
+
+# Optional feature for when BlackmagicRAW SDK is not available
+with-sdk = [] 
