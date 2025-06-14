@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tokio::task;
 use tracing::{debug, error, warn};
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 mod bindings {
     #![allow(non_upper_case_globals)]
     #![allow(non_camel_case_types)]
@@ -20,7 +20,7 @@ mod bindings {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 use bindings::*;
 
 /// Maximum file size for BRAW files (4GB limit for safety)
@@ -60,14 +60,14 @@ fn is_valid_braw_header(buffer: &[u8]) -> bool {
     buffer.len() >= 4 && &buffer[0..4] == b"BRAW"
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 /// SDK-enabled implementation
 pub struct BrawSdk {
     factory: *mut IBlackmagicRawFactory,
     codec: *mut IBlackmagicRaw,
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 impl BrawSdk {
     /// Initialize the BRAW SDK
     pub async fn new() -> Result<Self, BrawError> {
@@ -140,7 +140,7 @@ impl BrawSdk {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 impl Drop for BrawSdk {
     fn drop(&mut self) {
         unsafe {
@@ -155,13 +155,13 @@ impl Drop for BrawSdk {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 /// Represents an opened BRAW clip file
 pub struct BrawClip {
     clip: *mut IBlackmagicRawClip,
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 impl BrawClip {
     fn new(clip: *mut IBlackmagicRawClip) -> Self {
         BrawClip { clip }
@@ -215,7 +215,7 @@ impl BrawClip {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 impl Drop for BrawClip {
     fn drop(&mut self) {
         unsafe {
@@ -226,7 +226,7 @@ impl Drop for BrawClip {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 unsafe fn extract_clip_metadata(clip: *mut IBlackmagicRawClip) -> Result<BrawMetadata, BrawError> {
     let mut metadata = BrawMetadata::default();
     
@@ -274,7 +274,7 @@ unsafe fn extract_clip_metadata(clip: *mut IBlackmagicRawClip) -> Result<BrawMet
     Ok(metadata)
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 unsafe fn extract_metadata_from_iterator(
     iterator: *mut IBlackmagicRawMetadataIterator,
     metadata: &mut BrawMetadata,
@@ -318,7 +318,7 @@ unsafe fn extract_metadata_from_iterator(
     Ok(())
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 fn match_and_extract_metadata(key: &str, variant: &Variant, metadata: &mut BrawMetadata) {
     match key {
         "cameraModel" | "camera_model" => {
@@ -393,7 +393,7 @@ fn match_and_extract_metadata(key: &str, variant: &Variant, metadata: &mut BrawM
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 fn extract_string_from_variant(variant: &Variant) -> Option<String> {
     unsafe {
         match variant.vt {
@@ -430,7 +430,7 @@ fn extract_string_from_variant(variant: &Variant) -> Option<String> {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 fn extract_u32_from_variant(variant: &Variant) -> Option<u32> {
     unsafe {
         match variant.vt {
@@ -443,7 +443,7 @@ fn extract_u32_from_variant(variant: &Variant) -> Option<u32> {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 fn extract_i32_from_variant(variant: &Variant) -> Option<i32> {
     unsafe {
         match variant.vt {
@@ -456,7 +456,7 @@ fn extract_i32_from_variant(variant: &Variant) -> Option<i32> {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 fn extract_f32_from_variant(variant: &Variant) -> Option<f32> {
     unsafe {
         match variant.vt {
@@ -467,7 +467,7 @@ fn extract_f32_from_variant(variant: &Variant) -> Option<f32> {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 unsafe fn extract_frame_data(clip: *mut IBlackmagicRawClip, frame_index: u64) -> Result<Vec<u8>, BrawError> {
     // Create a job to read the frame
     let mut job: *mut IBlackmagicRawJob = ptr::null_mut();
@@ -499,8 +499,46 @@ unsafe fn extract_frame_data(clip: *mut IBlackmagicRawClip, frame_index: u64) ->
     Ok(vec![0u8; data_size])
 }
 
-// Fallback implementation when SDK is not available
+// -----------------------------------------------------------------------------
+// Stub implementation (CLI placeholder) when the native FFI feature is disabled
+// -----------------------------------------------------------------------------
+
+#[cfg(all(feature = "with-sdk", not(feature = "native-ffi")))]
+#[derive(Debug)]
+pub struct BrawSdk;
+
+#[cfg(all(feature = "with-sdk", not(feature = "native-ffi")))]
+impl BrawSdk {
+    pub async fn new() -> Result<Self, BrawError> {
+        // In CLI placeholder mode we don't require any initialization
+        Ok(BrawSdk)
+    }
+    pub async fn open_clip(&self, _path: &Path) -> Result<BrawClip, BrawError> {
+        // For now return error to indicate unimplemented; thumbnail module will fall back.
+        Err(BrawError::SdkUnavailable)
+    }
+}
+
+#[cfg(all(feature = "with-sdk", not(feature = "native-ffi")))]
+#[derive(Debug, Clone, Copy)]
+pub struct BrawClip;
+
+#[cfg(all(feature = "with-sdk", not(feature = "native-ffi")))]
+impl BrawClip {
+    pub async fn get_metadata(&self) -> Result<BrawMetadata, BrawError> {
+        Err(BrawError::SdkUnavailable)
+    }
+    pub async fn get_frame_count(&self) -> Result<u64, BrawError> {
+        Err(BrawError::SdkUnavailable)
+    }
+    pub async fn extract_frame(&self, _frame_index: u64) -> Result<Vec<u8>, BrawError> {
+        Err(BrawError::SdkUnavailable)
+    }
+}
+
+// Fallback implementation when SDK feature is completely disabled
 #[cfg(not(feature = "with-sdk"))]
+#[derive(Debug)]
 pub struct BrawSdk;
 
 #[cfg(not(feature = "with-sdk"))]
@@ -515,6 +553,7 @@ impl BrawSdk {
 }
 
 #[cfg(not(feature = "with-sdk"))]
+#[derive(Debug, Clone, Copy)]
 pub struct BrawClip;
 
 #[cfg(not(feature = "with-sdk"))]
@@ -522,11 +561,9 @@ impl BrawClip {
     pub async fn get_metadata(&self) -> Result<BrawMetadata, BrawError> {
         Err(BrawError::SdkUnavailable)
     }
-    
     pub async fn get_frame_count(&self) -> Result<u64, BrawError> {
         Err(BrawError::SdkUnavailable)
     }
-    
     pub async fn extract_frame(&self, _frame_index: u64) -> Result<Vec<u8>, BrawError> {
         Err(BrawError::SdkUnavailable)
     }

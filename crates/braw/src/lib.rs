@@ -155,8 +155,8 @@ impl BrawFile {
     
     /// Generate a thumbnail (not available without SDK)
     #[cfg(not(feature = "with-sdk"))]
-    pub async fn generate_thumbnail(&self, _config: ()) -> BrawResult<()> {
-        Err(BrawError::SdkUnavailable)
+    pub async fn generate_thumbnail(&self, config: thumbnail::ThumbnailConfig) -> BrawResult<image::DynamicImage> {
+        thumbnail::generate_braw_thumbnail(&self.path, config).await
     }
     
     /// Extract a frame at timestamp (requires SDK support)

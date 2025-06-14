@@ -225,3 +225,24 @@ The implementation is **production-ready for basic file detection** and provides
 ✅ **Memory-safe SDK wrapper**  
 
 The implementation successfully provides **complete BlackmagicRAW support infrastructure** following all user requirements and Spacedrive's existing patterns. 
+
+## 2025-06-14 Updates
+
+1. Introduced configurable feature flags:
+   * `with-sdk` – enables BRAW support at the crate level while still compiling on machines that don't have the C++ SDK available.  Currently relies on placeholder logic that produces gradient thumbnails.
+   * `native-ffi` – opt-in flag that *also* requires `with-sdk` and enables the real FFI bindings generated with bindgen.  Needs the Blackmagic RAW SDK, clang and correct environment variables.
+
+2. Build Script (`crates/braw/build.rs`)
+   * Binding generation and linker search paths are now gated behind `native-ffi` instead of `with-sdk`.
+   * Non-FFI builds simply emit a cargo warning so builds never fail on missing SDK.
+
+3. `sdk.rs`
+   * All FFI heavy code paths are now `#[cfg(feature = "native-ffi")]`.
+   * Added lightweight stub implementation for `BrawSdk` / `BrawClip` when `with-sdk` is enabled without `native-ffi`.
+   * Added derives (`Debug`, `Clone`, `Copy`) for stub structs to keep `BrawFile` compilable with `#[derive(Debug)]`.
+
+4. `thumbnail.rs`
+   * Functions that need the SDK are now behind `#[cfg(feature = "with-sdk")]`.
+   * Added gradient placeholder thumbnail generation when only `with-sdk` (no FFI) or no SDK at all is present.
+
+Result: The Spacedrive workspace compiles successfully with `--features braw` on machines *without* the proprietary SDK while still allowing power-users to enable full native decoding via `--features braw,with-sdk,native-ffi` once they have the official Blackmagic RAW SDK installed. 

@@ -5,7 +5,7 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     
     // Only build bindings if the with-sdk feature is enabled
-    #[cfg(feature = "with-sdk")]
+    #[cfg(feature = "native-ffi")]
     {
         let sdk_path = get_sdk_path();
         
@@ -17,7 +17,7 @@ fn main() {
         }
     }
     
-    #[cfg(not(feature = "with-sdk"))]
+    #[cfg(not(feature = "native-ffi"))]
     {
         println!("cargo:warning=BlackmagicRAW SDK support disabled (enable with --features with-sdk)");
     }
@@ -54,7 +54,7 @@ fn get_sdk_path() -> PathBuf {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 fn link_sdk(sdk_path: &PathBuf) {
     #[cfg(target_os = "macos")]
     {
@@ -78,7 +78,7 @@ fn link_sdk(sdk_path: &PathBuf) {
     }
 }
 
-#[cfg(feature = "with-sdk")]
+#[cfg(feature = "native-ffi")]
 fn generate_bindings(sdk_path: &PathBuf) {
     let header_path = {
         #[cfg(target_os = "macos")]

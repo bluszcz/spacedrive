@@ -23,5 +23,9 @@ bindgen = "0.69"
 [features]
 default = []
 
-# Optional feature for when BlackmagicRAW SDK is not available
-with-sdk = [] 
+# Enable BlackmagicRAW functionality using CLI placeholder implementation.
+with-sdk = []
+
+# Enable direct native FFI bindings to the BlackmagicRAW C++ SDK. Requires a working SDK installation and clang.
+# This is experimental and disabled by default.
+native-ffi = ["with-sdk"] 
