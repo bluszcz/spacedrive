@@ -202,27 +202,6 @@ pub fn detect_braw_magic_bytes(buffer: &[u8]) -> bool {
         && &buffer[0..BRAW_MAGIC_BYTES.len()] == BRAW_MAGIC_BYTES
 }
 
-/// Validate a BRAW file (basic validation without SDK)
-pub async fn validate_braw_file<P: AsRef<Path>>(path: P) -> BrawResult<()> {
-    let path = path.as_ref();
-    
-    // Check file exists
-    let metadata = fs::metadata(path).await?;
-    
-    // Check file size (must be at least larger than header)
-    if metadata.len() < 64 {
-        return Err(BrawError::InvalidFormat);
-    }
-    
-    // Check magic bytes
-    if !is_braw_file(path).await? {
-        return Err(BrawError::InvalidFormat);
-    }
-    
-    debug!("BRAW file validation passed: {}", path.display());
-    Ok(())
-}
-
 /// Extract basic metadata without SDK (limited information)
 async fn extract_basic_metadata(path: &Path) -> BrawResult<BrawMetadata> {
     debug!("Extracting basic metadata from: {}", path.display());

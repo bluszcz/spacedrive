@@ -44,7 +44,8 @@ impl Default for ThumbnailConfig {
     }
 }
 
-/// Generate a thumbnail from a BRAW file
+/// Generate a thumbnail from a BRAW file (requires SDK)
+#[cfg(feature = "with-sdk")]
 pub async fn generate_braw_thumbnail(
     path: &Path,
     config: ThumbnailConfig,
@@ -80,7 +81,8 @@ pub async fn generate_braw_thumbnail(
     Ok(thumbnail)
 }
 
-/// Generate multiple thumbnail sizes in parallel
+/// Generate multiple thumbnail sizes in parallel (requires SDK)
+#[cfg(feature = "with-sdk")]
 pub async fn generate_braw_thumbnails(
     path: &Path,
     sizes: &[ThumbnailSize],
@@ -102,9 +104,10 @@ pub async fn generate_braw_thumbnails(
     let frame_data = clip.extract_frame(target_frame).await?;
     let base_image = process_frame_to_image(frame_data, &clip).await?;
     
-    // Generate all thumbnail sizes in parallel
+    // Make the sizes owned so they can move into the blocking task
+    let sizes_vec: Vec<ThumbnailSize> = sizes.to_vec();
     let thumbnails = task::spawn_blocking(move || {
-        sizes.iter().map(|&size| {
+        sizes_vec.into_iter().map(|size| {
             let thumbnail = resize_image(base_image.clone(), size);
             (size, thumbnail)
         }).collect::<Vec<_>>()
@@ -209,6 +212,7 @@ fn resize_image(image: DynamicImage, target_size: ThumbnailSize) -> DynamicImage
 }
 
 /// Extract a frame at a specific timestamp (in seconds)
+#[cfg(feature = "with-sdk")]
 pub async fn extract_frame_at_timestamp(
     path: &Path,
     timestamp: f64,
@@ -245,6 +249,7 @@ pub async fn extract_frame_at_timestamp(
 }
 
 /// Generate a filmstrip preview with multiple frames
+#[cfg(feature = "with-sdk")]
 pub async fn generate_filmstrip_preview(
     path: &Path,
     frame_count: u32,
@@ -361,4 +366,53 @@ mod tests {
         assert_eq!(config.quality, 85);
         assert_eq!(config.frame_position, 0.1);
     }
+}
+
+// -----------------------------------------------------------------------------
+// Fallback implementations when the BlackmagicRAW SDK is NOT available
+// -----------------------------------------------------------------------------
+
+#[cfg(not(feature = "with-sdk"))]
+/// Generate a placeholder thumbnail when SDK support is disabled.
+pub async fn generate_braw_thumbnail(
+    _path: &Path,
+    config: ThumbnailConfig,
+) -> Result<DynamicImage, BrawError> {
+    // Create a simple gradient placeholder so the UI still has a miniature.
+    let size = config.size.as_u32();
+    let mut buffer = Vec::with_capacity((size * size * 3) as usize);
+
+    for y in 0..size {
+        for x in 0..size {
+            let r = ((x * 255) / size) as u8;
+            let g = ((y * 255) / size) as u8;
+            let b = 128u8;
+
+            buffer.push(r);
+            buffer.push(g);
+            buffer.push(b);
+        }
+    }
+
+    let rgb_image = RgbImage::from_raw(size, size, buffer)
+        .ok_or_else(|| BrawError::ImageProcessing("Failed to create placeholder image".into()))?;
+
+    Ok(DynamicImage::ImageRgb8(rgb_image))
+}
+
+#[cfg(not(feature = "with-sdk"))]
+/// Generate multiple placeholder thumbnails (one per requested size).
+pub async fn generate_braw_thumbnails(
+    _path: &Path,
+    sizes: &[ThumbnailSize],
+) -> Result<Vec<(ThumbnailSize, DynamicImage)>, BrawError> {
+    let mut thumbnails = Vec::with_capacity(sizes.len());
+
+    for &size in sizes {
+        let config = ThumbnailConfig { size, ..ThumbnailConfig::default() };
+        let thumb = generate_braw_thumbnail(Path::new(""), config).await?;
+        thumbnails.push((size, thumb));
+    }
+
+    Ok(thumbnails)
 } 
