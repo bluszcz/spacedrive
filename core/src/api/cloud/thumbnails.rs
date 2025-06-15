@@ -3,8 +3,6 @@ use crate::api::{Ctx, R};
 use sd_cloud_schema::{devices, libraries};
 use sd_prisma::prisma::file_path::cas_id;
 
-use futures::FutureExt;
-use futures_concurrency::future::TryJoin;
 use rspc::alpha::AlphaRouter;
 use serde::Deserialize;
 use tokio::sync::oneshot;
@@ -26,14 +24,16 @@ pub fn mount() -> AlphaRouter<Ctx> {
 			     library_pub_id,
 			     cas_id,
 			 }: CloudThumbnailRequestArgs| async move {
-				let ((client, access_token), cloud_p2p) = (
-					super::get_client_and_access_token(&node),
-					node.cloud_services
-						.cloud_p2p()
-						.map(|res| res.map_err(Into::into)),
-				)
-					.try_join()
-					.await?;
+				let cloud_p2p = match node.cloud_services.cloud_p2p().await {
+					Ok(p2p) => p2p,
+					Err(e) => {
+						error!(?e, "Failed to get Cloud P2P");
+						return Err(rspc::Error::new(
+							rspc::ErrorCode::InternalServerError,
+							"Cloud P2P not initialized".to_string(),
+						));
+					}
+				};
 
 				let (tx, rx) = oneshot::channel();
 

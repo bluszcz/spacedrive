@@ -1,7 +1,7 @@
 use crate::{Error, Result};
 use std::path::Path;
 
-use sd_braw::{BrawFile, BrawMetadata};
+use sd_braw::BrawMetadata;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -15,7 +15,7 @@ pub struct BrawMediaMetadata {
     pub codec: String,
     pub color_space: Option<String>,
     pub bit_depth: u8,
-    
+
     // Camera metadata
     pub camera_model: Option<String>,
     pub lens_info: Option<String>,
@@ -25,7 +25,7 @@ pub struct BrawMediaMetadata {
     pub color_temperature: Option<u32>,
     pub tint: Option<i32>,
     pub focal_length: Option<f32>,
-    
+
     // Recording metadata
     pub recording_date: Option<chrono::DateTime<chrono::Utc>>,
     pub timecode: Option<String>,
@@ -33,14 +33,14 @@ pub struct BrawMediaMetadata {
     pub scene: Option<String>,
     pub take: Option<String>,
     pub clip_name: Option<String>,
-    
+
     // BRAW specific
     pub compression_ratio: Option<String>,
     pub gamma: Option<String>,
     pub gamut: Option<String>,
     pub quality: Option<String>,
     pub generation: Option<u32>,
-    
+
     // File metadata
     pub file_size: Option<u64>,
 }
@@ -92,35 +92,35 @@ impl BrawMediaMetadata {
         #[cfg(feature = "braw")]
         {
             use sd_braw::BrawFile;
-            
+
             let braw_file = BrawFile::open(path.as_ref()).await
                 .map_err(|e| Error::BrawError(e.to_string()))?;
-            
+
             let metadata = braw_file.get_metadata().await
                 .map_err(|e| Error::BrawError(e.to_string()))?;
-            
+
             Ok(metadata.into())
         }
     }
-    
+
     /// Get aspect ratio as a string
     pub fn aspect_ratio(&self) -> String {
         if self.width == 0 || self.height == 0 {
             return "unknown".to_string();
         }
-        
+
         let gcd = gcd(self.width, self.height);
         let w = self.width / gcd;
         let h = self.height / gcd;
-        
+
         format!("{}:{}", w, h)
     }
-    
+
     /// Get resolution as a string
     pub fn resolution(&self) -> String {
         format!("{}x{}", self.width, self.height)
     }
-    
+
     /// Check if this is a high resolution format
     pub fn is_high_resolution(&self) -> bool {
         self.width >= 3840 || self.height >= 2160
@@ -134,4 +134,4 @@ fn gcd(a: u32, b: u32) -> u32 {
     } else {
         gcd(b, a % b)
     }
-} 
+}

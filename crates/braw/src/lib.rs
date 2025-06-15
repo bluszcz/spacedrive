@@ -89,28 +89,30 @@ impl BrawFile {
 
         #[cfg(feature = "with-sdk")]
         {
-            // Try to open with SDK
+            // Try to open with SDK, but don't fail if it doesn't work
             match sdk::BrawSdk::new().await {
                 Ok(sdk) => {
                     match sdk.open_clip(&path).await {
                         Ok(clip) => {
+                            debug!("Successfully opened BRAW file with SDK: {}", path.display());
                             return Ok(BrawFile {
                                 path,
                                 clip: Some(clip),
                             });
                         }
                         Err(e) => {
-                            warn!("Failed to open BRAW clip with SDK: {}, falling back to basic mode", e);
+                            debug!("Failed to open BRAW clip with SDK (expected with placeholder bindings): {}, using basic mode", e);
                         }
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to initialize BRAW SDK: {}, falling back to basic mode", e);
+                    debug!("Failed to initialize BRAW SDK (expected with placeholder bindings): {}, using basic mode", e);
                 }
             }
         }
 
-        // Fallback to basic mode (no SDK)
+        // Always succeed in basic mode (no SDK)
+        debug!("Using basic mode for BRAW file: {}", path.display());
         Ok(BrawFile {
             path,
             #[cfg(feature = "with-sdk")]

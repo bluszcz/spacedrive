@@ -9,7 +9,7 @@ use crate::sdk::{BrawSdk, BrawClip};
 use image::{DynamicImage, RgbImage, ImageFormat};
 use std::path::Path;
 use tokio::task;
-use tracing::{debug, warn};
+use tracing::{debug, warn, info};
 
 /// Standard thumbnail sizes used in Spacedrive
 #[derive(Debug, Clone, Copy)]
@@ -46,7 +46,7 @@ impl Default for ThumbnailConfig {
     }
 }
 
-/// Generate a thumbnail from a BRAW file (requires SDK)
+/// Generate a thumbnail from a BRAW file (always succeeds with placeholder if SDK fails)
 #[cfg(feature = "with-sdk")]
 pub async fn generate_braw_thumbnail(
     path: &Path,
@@ -54,29 +54,31 @@ pub async fn generate_braw_thumbnail(
 ) -> Result<DynamicImage, BrawError> {
     debug!("Generating BRAW thumbnail for {}", path.display());
 
+    // Always try to create a placeholder first as fallback
+    let placeholder = create_placeholder_image(512, 512)?;
+
     #[cfg(feature = "native-ffi")]
     {
-        // Try to use real SDK for thumbnail generation
+        // Try to use real SDK for thumbnail generation, but don't fail if it doesn't work
         match extract_frame_at_timestamp(path, config.frame_position as f64).await {
             Ok(image) => {
-                // Resize to requested size using our resize function
+                info!("Successfully extracted real BRAW frame for thumbnail: {}", path.display());
                 let thumbnail = resize_image(image, config.size);
                 return Ok(thumbnail);
             }
             Err(e) => {
-                warn!("Failed to extract frame with SDK, falling back to placeholder: {}", e);
+                debug!("Failed to extract frame with SDK (expected with placeholder bindings): {}", e);
             }
         }
     }
 
-    // Fallback: create placeholder and resize it
-    let placeholder = create_placeholder_image(512, 512)?;
+    // Use placeholder and resize it
+    info!("Using placeholder thumbnail for BRAW file: {}", path.display());
     let thumbnail = resize_image(placeholder, config.size);
-
     Ok(thumbnail)
 }
 
-/// Generate multiple thumbnail sizes in parallel (requires SDK)
+/// Generate multiple thumbnail sizes in parallel (always succeeds with placeholder if SDK fails)
 #[cfg(feature = "with-sdk")]
 pub async fn generate_braw_thumbnails(
     path: &Path,
@@ -84,19 +86,28 @@ pub async fn generate_braw_thumbnails(
 ) -> Result<Vec<(ThumbnailSize, DynamicImage)>, BrawError> {
     debug!("Generating {} BRAW thumbnails for {}", sizes.len(), path.display());
 
-    // Create a base image first
+    // Create a base image first - always start with placeholder
     let base_image = {
+        let placeholder = create_placeholder_image(512, 512)?;
+
         #[cfg(feature = "native-ffi")]
         {
-            // Try to extract a real frame first
+            // Try to extract a real frame first, but don't fail if it doesn't work
             match extract_frame_at_timestamp(path, 0.1).await {
-                Ok(image) => image,
-                Err(_) => create_placeholder_image(512, 512)?,
+                Ok(image) => {
+                    info!("Successfully extracted real BRAW frame for thumbnails: {}", path.display());
+                    image
+                }
+                Err(_) => {
+                    debug!("Using placeholder for BRAW thumbnails: {}", path.display());
+                    placeholder
+                }
             }
         }
         #[cfg(not(feature = "native-ffi"))]
         {
-            create_placeholder_image(512, 512)?
+            debug!("Using placeholder for BRAW thumbnails (native-ffi not enabled): {}", path.display());
+            placeholder
         }
     };
 

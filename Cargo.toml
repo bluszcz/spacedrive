@@ -155,3 +155,5 @@ lto           = true     # Enables link to optimizations
 opt-level     = "s"      # Optimize for binary size
 panic         = "unwind" # Sadly we need unwind to avoid unexpected crashes on third party crates
 strip         = true     # Remove debug symbols
+
+

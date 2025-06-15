@@ -31,7 +31,7 @@ use tokio::{
 	task::spawn_blocking,
 	time::{sleep, Instant},
 };
-use tracing::{error, instrument, trace};
+use tracing::{error, instrument, trace, info};
 use uuid::Uuid;
 use webp::{Encoder, WebPConfig};
 
@@ -208,7 +208,7 @@ pub fn get_shard_hex<'cas_id>(cas_id: &'cas_id CasId<'cas_id>) -> &'cas_id str {
 #[cfg(feature = "ffmpeg")]
 #[must_use]
 pub const fn can_generate_thumbnail_for_video(video_extension: VideoExtension) -> bool {
-	use VideoExtension::{Braw, Hevc, M2ts, M2v, Mpg, Mts, Swf, Ts};
+	use VideoExtension::{Hevc, M2ts, M2v, Mpg, Mts, Swf, Ts};
 	// File extensions that are specifically not supported by the thumbnailer
 	!matches!(video_extension, Mpg | Swf | M2v | Hevc | M2ts | Mts | Ts)
 }
@@ -497,7 +497,8 @@ async fn generate_video_thumbnail(
 			// Handle BRAW files with our custom BRAW thumbnail generator
 			#[cfg(feature = "braw")]
 			{
-				use sd_braw::{BrawFile, thumbnail::ThumbnailSize};
+				info!("Using BRAW thumbnail generator for: {:?}", file_path);
+				use sd_braw::{thumbnail::ThumbnailSize, BrawFile};
 
 				// Generate BRAW thumbnail
 				let braw_file = BrawFile::open(file_path).await.map_err(|e| {
@@ -514,12 +515,15 @@ async fn generate_video_thumbnail(
 					frame_position: 0.1, // 10% into the video
 				};
 
-				let thumbnail_image = braw_file.generate_thumbnail(thumbnail_config).await.map_err(|e| {
-					thumbnailer::NonCriticalThumbnailerError::VideoThumbnailGenerationFailed(
-						file_path.to_path_buf(),
-						format!("Failed to generate BRAW thumbnail: {}", e),
-					)
-				})?;
+				let thumbnail_image = braw_file
+					.generate_thumbnail(thumbnail_config)
+					.await
+					.map_err(|e| {
+						thumbnailer::NonCriticalThumbnailerError::VideoThumbnailGenerationFailed(
+							file_path.to_path_buf(),
+							format!("Failed to generate BRAW thumbnail: {}", e),
+						)
+					})?;
 
 				// Create directory first (before WebP encoding to avoid Send issues)
 				let shard_dir = output_path.parent().unwrap();
@@ -563,10 +567,12 @@ async fn generate_video_thumbnail(
 
 			#[cfg(not(feature = "braw"))]
 			{
-				return Err(thumbnailer::NonCriticalThumbnailerError::VideoThumbnailGenerationFailed(
-					file_path.to_path_buf(),
-					"BRAW support not enabled".to_string(),
-				));
+				return Err(
+					thumbnailer::NonCriticalThumbnailerError::VideoThumbnailGenerationFailed(
+						file_path.to_path_buf(),
+						"BRAW support not enabled".to_string(),
+					),
+				);
 			}
 		}
 	}
@@ -597,12 +603,13 @@ pub async fn generate_single_thumbnail(
 	path: impl AsRef<Path> + Send,
 	kind: ThumbnailKind,
 ) -> Result<(), thumbnailer::NonCriticalThumbnailerError> {
+	info!(path = ?path.as_ref(), "Executing generate_single_thumbnail");
 	let mut last_single_thumb_generated_guard = LAST_SINGLE_THUMB_GENERATED_LOCK.lock().await;
 
 	let elapsed = Instant::now() - *last_single_thumb_generated_guard;
 	if elapsed < HALF_SEC {
 		// This will choke up in case someone try to use this method in a loop, otherwise
-		// it will consume all the machine resources like a gluton monster from hell
+		// it will just work as a rate limiter.
 		sleep(HALF_SEC - elapsed).await;
 	}
 

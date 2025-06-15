@@ -1,0 +1,113 @@
+[BRAW DEV] Using BlackmagicRAW SDK at: /Applications/Blackmagic RAW/Blackmagic RAW SDK
+[BRAW DEV] Set runtime framework paths for BlackmagicRAW
+[BRAW DEV] Generating Prisma clients …
+Prisma schema loaded from core/prisma/schema.prisma
+
+✔ Generated Prisma Client Rust to ./crates/prisma/src/prisma in 1.88s
+
+✔ Generated SD Sync Generator to ./crates/prisma/src/prisma_sync in 264ms
+
+[BRAW DEV] Prisma client generation complete.
+[BRAW DEV] Building frontend (Vite) …
+Scope: all 14 workspace projects
+../..                                    | Progress: resolved 0, reused 1, downloaded 0, added 0
+../..                                    | Progress: resolved 0, reused 109, downloaded 0, added 0
+../..                                    | Progress: resolved 0, reused 122, downloaded 0, added 0
+../..                                    | -210 ---------------------
+../..                                    | Progress: resolved 0, reused 122, downloaded 0, added 0, done
+
+Done in 6.8s
+
+> @sd/desktop@ build /Users/bluszcz/Dev/spacedrive/apps/desktop
+> vite build
+
+vite v5.4.9 building for production...
+
+ WARN 
+(!) outDir /Users/bluszcz/Dev/spacedrive/apps/desktop/dist is not inside project root and will not be emptied.
+Use --emptyOutDir to override.
+
+
+transforming...
+
+  ⚡ Million.js 2.6.4
+  - Tip:     enable { mute: true } to disable info logs
+  - Hotline: https://million.dev/hotline
+
+
+ WARN  ../../node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+
+ WARN  ../../node_modules/@tanstack/react-query/build/modern/useBaseQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+ ⚡ <Tags> now renders ~25% faster
+ ⚡ <Spacedrop> now renders ~17% faster
+
+ WARN  ../../packages/ui/src/CheckBox.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Button.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+ ⚡ <Demo3> now renders ~43% faster
+
+ WARN  ../../packages/ui/src/ContextMenu.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Dialog.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Dropdown.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/DropdownMenu.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Input.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/ProgressBar.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Popover.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Resizable.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/RadioGroup.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Tabs.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Slider.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Switch.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Select.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Tooltip.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/forms/index.ts (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../packages/ui/src/Toast.tsx (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+
+ WARN  ../../node_modules/@tanstack/react-query-devtools/build/modern/index.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+

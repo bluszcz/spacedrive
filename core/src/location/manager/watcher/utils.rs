@@ -429,6 +429,7 @@ async fn inner_create_file(
 					let library_id = *library_id;
 
 					async move {
+						tracing::info!(?path, "Spawning thumbnail generation task for new file");
 						if let Err(e) = generate_single_thumbnail(
 							&thumbnails_directory,
 							extension,

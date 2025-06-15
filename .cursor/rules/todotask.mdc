@@ -1,0 +1,6 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+ i just added braw support which should be compatible with other video formats, and i want my thumbnails from braw fiels and my braw files properly indexed!
