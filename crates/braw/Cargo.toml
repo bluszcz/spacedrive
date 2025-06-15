@@ -10,12 +10,15 @@ edition.workspace = true
 [dependencies]
 thiserror = { workspace = true }
 image = { workspace = true }
-tokio = { workspace = true, features = ["fs", "rt-multi-thread", "io-util"] }
+tokio = { workspace = true, features = ["fs", "rt-multi-thread", "io-util", "macros"] }
 libc = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 specta = { workspace = true, features = ["serde"] }
 chrono = { workspace = true, features = ["serde"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = { version = "0.9", optional = true }
 
 [build-dependencies]
 bindgen = "0.69"
@@ -28,4 +31,4 @@ with-sdk = []
 
 # Enable direct native FFI bindings to the BlackmagicRAW C++ SDK. Requires a working SDK installation and clang.
 # This is experimental and disabled by default.
-native-ffi = ["with-sdk"] 
+native-ffi = ["with-sdk", "core-foundation"]

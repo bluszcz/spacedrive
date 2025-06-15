@@ -11,6 +11,8 @@ repository.workspace = true
 default = []
 # This feature controls whether the Spacedrive Heavy Lifting contains functionality which requires FFmpeg.
 ffmpeg = ["dep:sd-ffmpeg"]
+# This feature controls whether the Spacedrive Heavy Lifting contains functionality which requires BRAW support.
+braw = ["dep:sd-braw"]
 
 [dependencies]
 # Inner Core Sub-crates
@@ -20,6 +22,7 @@ sd-core-prisma-helpers   = { path = "../prisma-helpers" }
 sd-core-sync             = { path = "../sync" }
 
 # Spacedrive Sub-crates
+sd-braw           = { path = "../../../crates/braw", optional = true }
 sd-ffmpeg         = { path = "../../../crates/ffmpeg", optional = true }
 sd-file-ext       = { path = "../../../crates/file-ext" }
 sd-images         = { path = "../../../crates/images" }

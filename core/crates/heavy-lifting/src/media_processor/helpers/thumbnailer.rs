@@ -208,7 +208,7 @@ pub fn get_shard_hex<'cas_id>(cas_id: &'cas_id CasId<'cas_id>) -> &'cas_id str {
 #[cfg(feature = "ffmpeg")]
 #[must_use]
 pub const fn can_generate_thumbnail_for_video(video_extension: VideoExtension) -> bool {
-	use VideoExtension::{Hevc, M2ts, M2v, Mpg, Mts, Swf, Ts};
+	use VideoExtension::{Braw, Hevc, M2ts, M2v, Mpg, Mts, Swf, Ts};
 	// File extensions that are specifically not supported by the thumbnailer
 	!matches!(video_extension, Mpg | Swf | M2v | Hevc | M2ts | Mts | Ts)
 }
@@ -488,9 +488,91 @@ async fn generate_video_thumbnail(
 	file_path: impl AsRef<Path> + Send,
 	output_path: impl AsRef<Path> + Send,
 ) -> Result<(), thumbnailer::NonCriticalThumbnailerError> {
-	use sd_ffmpeg::{to_thumbnail, ThumbnailSize};
-
 	let file_path = file_path.as_ref();
+	let output_path = output_path.as_ref();
+
+	// Check if this is a BRAW file
+	if let Some(extension) = file_path.extension().and_then(|ext| ext.to_str()) {
+		if extension.to_lowercase() == "braw" {
+			// Handle BRAW files with our custom BRAW thumbnail generator
+			#[cfg(feature = "braw")]
+			{
+				use sd_braw::{BrawFile, thumbnail::ThumbnailSize};
+
+				// Generate BRAW thumbnail
+				let braw_file = BrawFile::open(file_path).await.map_err(|e| {
+					thumbnailer::NonCriticalThumbnailerError::VideoThumbnailGenerationFailed(
+						file_path.to_path_buf(),
+						format!("Failed to open BRAW file: {}", e),
+					)
+				})?;
+
+				let thumbnail_config = sd_braw::thumbnail::ThumbnailConfig {
+					size: ThumbnailSize::Large, // 512px, good for thumbnails
+					quality: TARGET_QUALITY as u8,
+					format: image::ImageFormat::Jpeg,
+					frame_position: 0.1, // 10% into the video
+				};
+
+				let thumbnail_image = braw_file.generate_thumbnail(thumbnail_config).await.map_err(|e| {
+					thumbnailer::NonCriticalThumbnailerError::VideoThumbnailGenerationFailed(
+						file_path.to_path_buf(),
+						format!("Failed to generate BRAW thumbnail: {}", e),
+					)
+				})?;
+
+				// Create directory first (before WebP encoding to avoid Send issues)
+				let shard_dir = output_path.parent().unwrap();
+				if !shard_dir.exists() {
+					fs::create_dir_all(shard_dir).await.map_err(|e| {
+						thumbnailer::NonCriticalThumbnailerError::CreateShardDirectory(
+							FileIOError::from((shard_dir, e)).to_string(),
+						)
+					})?;
+				}
+
+				// Convert to WebP (all sync operations in a block to ensure proper dropping)
+				let webp_bytes = {
+					let encoder = Encoder::from_image(&thumbnail_image).map_err(|e| {
+						thumbnailer::NonCriticalThumbnailerError::WebPEncoding(
+							file_path.to_path_buf(),
+							format!("{:?}", e),
+						)
+					})?;
+
+					let webp_data = encoder.encode_advanced(&WEBP_CONFIG).map_err(|e| {
+						thumbnailer::NonCriticalThumbnailerError::WebPEncoding(
+							file_path.to_path_buf(),
+							format!("{:?}", e),
+						)
+					})?;
+
+					webp_data.to_vec()
+				}; // WebPMemory is dropped here
+
+				// Now write the file (async operation with Send-safe data)
+				fs::write(&output_path, webp_bytes).await.map_err(|e| {
+					thumbnailer::NonCriticalThumbnailerError::SaveThumbnail(
+						output_path.to_path_buf(),
+						FileIOError::from((output_path, e)).to_string(),
+					)
+				})?;
+
+				return Ok(());
+			}
+
+			#[cfg(not(feature = "braw"))]
+			{
+				return Err(thumbnailer::NonCriticalThumbnailerError::VideoThumbnailGenerationFailed(
+					file_path.to_path_buf(),
+					"BRAW support not enabled".to_string(),
+				));
+			}
+		}
+	}
+
+	// For non-BRAW video files, use FFmpeg
+	use sd_ffmpeg::{to_thumbnail, ThumbnailSize};
 
 	to_thumbnail(
 		file_path,

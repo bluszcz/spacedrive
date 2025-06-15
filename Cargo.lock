@@ -10011,6 +10011,7 @@ version = "0.1.0"
 dependencies = [
  "bindgen 0.69.5",
  "chrono",
+ "core-foundation 0.9.4",
  "image",
  "libc",
  "serde",
@@ -10221,6 +10222,7 @@ dependencies = [
  "rmp-serde",
  "rmpv",
  "rspc",
+ "sd-braw",
  "sd-core-file-path-helper",
  "sd-core-indexer-rules",
  "sd-core-prisma-helpers",

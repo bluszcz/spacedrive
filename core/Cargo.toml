@@ -16,6 +16,8 @@ mobile = []
 # This feature controls whether the Spacedrive Core contains functionality which requires FFmpeg.
 ai     = ["dep:sd-ai"]
 ffmpeg = ["sd-core-heavy-lifting/ffmpeg", "sd-media-metadata/ffmpeg"]
+# This feature controls whether the Spacedrive Core contains functionality which requires BRAW support.
+braw   = ["sd-core-heavy-lifting/braw", "sd-media-metadata/braw"]
 heif   = ["sd-images/heif"]
 
 [dependencies]
