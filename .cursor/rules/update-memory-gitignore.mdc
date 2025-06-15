@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Always update memory bank after every change of the code or anything. 
+Always git ignore keep updated.
