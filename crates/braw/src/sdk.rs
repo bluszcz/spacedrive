@@ -4,11 +4,7 @@
 //! handling all FFI and memory management internally.
 
 use crate::{BrawError, BrawMetadata};
-use std::ffi::{CStr, CString};
 use std::path::Path;
-use std::ptr;
-use std::sync::Arc;
-use tokio::task;
 use tracing::{debug, error, warn};
 
 #[cfg(feature = "native-ffi")]

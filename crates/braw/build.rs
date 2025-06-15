@@ -4,7 +4,7 @@ use std::path::PathBuf;
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     
-    // Only build bindings if the with-sdk feature is enabled
+    // Only build bindings if the native-ffi feature is enabled
     #[cfg(feature = "native-ffi")]
     {
         let sdk_path = get_sdk_path();
@@ -16,11 +16,7 @@ fn main() {
             panic!("BlackmagicRAW SDK not found at: {}", sdk_path.display());
         }
     }
-    
-    #[cfg(not(feature = "native-ffi"))]
-    {
-        println!("cargo:warning=BlackmagicRAW SDK support disabled (enable with --features with-sdk)");
-    }
+    // No warning for with-sdk only (safe stubs mode)
 }
 
 fn get_sdk_path() -> PathBuf {
