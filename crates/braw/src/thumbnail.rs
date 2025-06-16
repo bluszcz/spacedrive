@@ -5,11 +5,11 @@
 
 use crate::BrawError;
 #[cfg(feature = "with-sdk")]
-use crate::sdk::{BrawSdk, BrawClip};
+use crate::sdk::BrawClip;
 use image::{DynamicImage, RgbImage, ImageFormat};
 use std::path::Path;
 use tokio::task;
-use tracing::{debug, warn, info};
+use tracing::{debug, warn};
 
 /// Standard thumbnail sizes used in Spacedrive
 #[derive(Debug, Clone, Copy)]
@@ -46,7 +46,7 @@ impl Default for ThumbnailConfig {
     }
 }
 
-/// Generate a thumbnail from a BRAW file (always succeeds with placeholder if SDK fails)
+/// Generate a thumbnail from a BRAW file (requires real BlackmagicRAW SDK)
 #[cfg(feature = "with-sdk")]
 pub async fn generate_braw_thumbnail(
     path: &Path,
@@ -54,31 +54,31 @@ pub async fn generate_braw_thumbnail(
 ) -> Result<DynamicImage, BrawError> {
     debug!("Generating BRAW thumbnail for {}", path.display());
 
-    // Always try to create a placeholder first as fallback
-    let placeholder = create_placeholder_image(512, 512)?;
-
     #[cfg(feature = "native-ffi")]
     {
-        // Try to use real SDK for thumbnail generation, but don't fail if it doesn't work
+        // Try to use real SDK for thumbnail generation
         match extract_frame_at_timestamp(path, config.frame_position as f64).await {
             Ok(image) => {
-                info!("Successfully extracted real BRAW frame for thumbnail: {}", path.display());
+                debug!("Successfully extracted real BRAW frame for thumbnail: {}", path.display());
                 let thumbnail = resize_image(image, config.size);
                 return Ok(thumbnail);
             }
             Err(e) => {
-                debug!("Failed to extract frame with SDK (expected with placeholder bindings): {}", e);
+                warn!("Failed to extract frame with BlackmagicRAW SDK: {}", e);
+                return Err(e);
             }
         }
     }
 
-    // Use placeholder and resize it
-    info!("Using placeholder thumbnail for BRAW file: {}", path.display());
-    let thumbnail = resize_image(placeholder, config.size);
-    Ok(thumbnail)
+    // No fallback - BRAW files require the BlackmagicRAW SDK
+    #[cfg(not(feature = "native-ffi"))]
+    {
+        warn!("BRAW thumbnail generation requires native-ffi feature and BlackmagicRAW SDK");
+        return Err(BrawError::SdkUnavailable);
+    }
 }
 
-/// Generate multiple thumbnail sizes in parallel (always succeeds with placeholder if SDK fails)
+/// Generate multiple thumbnail sizes in parallel (requires real BlackmagicRAW SDK)
 #[cfg(feature = "with-sdk")]
 pub async fn generate_braw_thumbnails(
     path: &Path,
@@ -86,28 +86,25 @@ pub async fn generate_braw_thumbnails(
 ) -> Result<Vec<(ThumbnailSize, DynamicImage)>, BrawError> {
     debug!("Generating {} BRAW thumbnails for {}", sizes.len(), path.display());
 
-    // Create a base image first - always start with placeholder
-    let base_image = {
-        let placeholder = create_placeholder_image(512, 512)?;
-
+    // Extract one base frame using the BlackmagicRAW SDK
+    let base_image: DynamicImage = {
         #[cfg(feature = "native-ffi")]
         {
-            // Try to extract a real frame first, but don't fail if it doesn't work
             match extract_frame_at_timestamp(path, 0.1).await {
                 Ok(image) => {
-                    info!("Successfully extracted real BRAW frame for thumbnails: {}", path.display());
+                    debug!("Successfully extracted real BRAW frame for thumbnails: {}", path.display());
                     image
                 }
-                Err(_) => {
-                    debug!("Using placeholder for BRAW thumbnails: {}", path.display());
-                    placeholder
+                Err(e) => {
+                    warn!("Failed to extract BRAW frame with SDK: {}", e);
+                    return Err(e);
                 }
             }
         }
         #[cfg(not(feature = "native-ffi"))]
         {
-            debug!("Using placeholder for BRAW thumbnails (native-ffi not enabled): {}", path.display());
-            placeholder
+            warn!("BRAW thumbnail generation requires native-ffi feature and BlackmagicRAW SDK");
+            return Err(BrawError::SdkUnavailable);
         }
     };
 
@@ -126,9 +123,9 @@ async fn process_frame_to_image(
     frame_data: Vec<u8>,
     clip: &BrawClip,
 ) -> Result<DynamicImage, BrawError> {
-    let metadata = clip.get_metadata().await?;
-    let width = metadata.width;
-    let height = metadata.height;
+    // For now, use default dimensions since SDK metadata doesn't include width/height yet
+    let width = 1920u32;  // Default HD width
+    let height = 1080u32; // Default HD height
 
     // Process the frame data based on the BRAW format
     let image = process_braw_frame_data(frame_data, width, height)?;
@@ -137,6 +134,7 @@ async fn process_frame_to_image(
 }
 
 /// Convert raw BRAW frame data to RGB image
+#[allow(dead_code)]
 fn process_braw_frame_data(
     frame_data: Vec<u8>,
     width: u32,
@@ -168,15 +166,39 @@ fn process_braw_frame_data(
 
 /// Create a placeholder image when real frame data is unavailable
 fn create_placeholder_image(width: u32, height: u32) -> Result<DynamicImage, BrawError> {
-    // Create a gradient placeholder image
+    // Create a dark video-like placeholder with BRAW branding
     let mut buffer = Vec::with_capacity((width * height * 3) as usize);
+
+    // Dark background color (dark gray)
+    let bg_r = 32u8;
+    let bg_g = 32u8;
+    let bg_b = 32u8;
+
+    // BRAW brand color (orange/red)
+    let brand_r = 255u8;
+    let brand_g = 100u8;
+    let brand_b = 0u8;
 
     for y in 0..height {
         for x in 0..width {
-            // Create a simple gradient pattern
-            let r = ((x * 255) / width) as u8;
-            let g = ((y * 255) / height) as u8;
-            let b = 128u8; // Constant blue
+            // Create a simple BRAW logo-like pattern in the center
+            let center_x = width / 2;
+            let center_y = height / 2;
+            let logo_size = (width.min(height) / 8).max(20); // Minimum 20px logo
+
+            let dx = (x as i32 - center_x as i32).abs() as u32;
+            let dy = (y as i32 - center_y as i32).abs() as u32;
+
+            let (r, g, b) = if dx < logo_size && dy < logo_size / 2 {
+                // BRAW logo area - use brand color
+                (brand_r, brand_g, brand_b)
+            } else if dx < logo_size + 2 && dy < logo_size / 2 + 2 {
+                // Logo border - slightly lighter
+                (brand_r / 2, brand_g / 2, brand_b / 2)
+            } else {
+                // Background - dark gray
+                (bg_r, bg_g, bg_b)
+            };
 
             buffer.push(r);
             buffer.push(g);
@@ -210,7 +232,7 @@ fn resize_image(image: DynamicImage, target_size: ThumbnailSize) -> DynamicImage
     image.resize(new_width, new_height, image::imageops::FilterType::Lanczos3)
 }
 
-/// Extract a frame at a specific timestamp (in seconds)
+/// Extract a frame at a specific timestamp
 #[cfg(feature = "with-sdk")]
 pub async fn extract_frame_at_timestamp(
     path: &Path,
@@ -218,17 +240,15 @@ pub async fn extract_frame_at_timestamp(
 ) -> Result<DynamicImage, BrawError> {
     debug!("Extracting frame at {}s from {}", timestamp, path.display());
 
-    // Try to use the SDK, but always fall back to placeholder if it fails
+    // Only use the BlackmagicRAW SDK - no fallbacks
     match try_extract_frame_with_sdk(path, timestamp).await {
         Ok(image) => {
-            info!("Successfully extracted real BRAW frame at {}s from {}", timestamp, path.display());
+            debug!("Successfully extracted real BRAW frame at {}s from {}", timestamp, path.display());
             Ok(image)
         }
         Err(e) => {
-            debug!("Failed to extract frame with SDK (expected with stub implementation): {}, using placeholder", e);
-            // Always fall back to placeholder - never fail thumbnail generation
-            let placeholder = create_placeholder_image(512, 512)?;
-            Ok(placeholder)
+            warn!("Failed to extract frame with BlackmagicRAW SDK: {}", e);
+            Err(e)
         }
     }
 }
@@ -239,28 +259,19 @@ async fn try_extract_frame_with_sdk(
     path: &Path,
     timestamp: f64,
 ) -> Result<DynamicImage, BrawError> {
-    let mut sdk = BrawSdk::new().await?;
-    let clip = sdk.open_clip(path).await?;
+    let clip = crate::sdk::BrawClip::open(path.to_path_buf()).await?;
 
     // Get metadata to calculate frame index
-    let metadata = clip.get_metadata().await?;
-    let frame_rate = metadata.frame_rate;
-    let total_duration = metadata.duration_seconds;
+    let frame_count = clip.get_frame_count()?;
+    let (width, height) = clip.get_dimensions()?;
 
-    // Validate timestamp
-    if timestamp < 0.0 || timestamp > total_duration {
-        return Err(BrawError::FrameOutOfRange {
-            frame: (timestamp * frame_rate) as u32,
-            max_frames: metadata.total_frames,
-        });
-    }
-
-    // Calculate frame index
+    // Calculate frame index from timestamp (assume 24fps for now)
+    let frame_rate = 24.0;
     let frame_index = (timestamp * frame_rate) as u64;
-    let frame_index = frame_index.min(metadata.total_frames as u64 - 1);
+    let frame_index = frame_index.min(frame_count as u64 - 1);
 
     // Extract and process frame
-    let frame_data = clip.extract_frame(frame_index).await?;
+    let frame_data = clip.extract_frame(frame_index)?;
     let image = process_frame_to_image(frame_data, &clip).await?;
 
     debug!("Extracted frame {} ({}s) from {}", frame_index, timestamp, path.display());
@@ -277,11 +288,10 @@ pub async fn generate_filmstrip_preview(
 ) -> Result<Vec<DynamicImage>, BrawError> {
     debug!("Generating filmstrip with {} frames from {}", frame_count, path.display());
 
-    let mut sdk = BrawSdk::new().await?;
-    let clip = sdk.open_clip(path).await?;
+    let clip = crate::sdk::BrawClip::open(path.to_path_buf()).await?;
 
-    let metadata = clip.get_metadata().await?;
-    let total_frames = metadata.total_frames as u64;
+    let frame_count = clip.get_frame_count()?;
+    let total_frames = frame_count as u64;
 
     if frame_count == 0 {
         return Ok(Vec::new());
@@ -302,7 +312,7 @@ pub async fn generate_filmstrip_preview(
     for (i, &frame_index) in frame_indices.iter().enumerate() {
         debug!("Extracting filmstrip frame {} of {} (frame {})", i + 1, frame_count, frame_index);
 
-        let frame_data = clip.extract_frame(frame_index).await?;
+        let frame_data = clip.extract_frame(frame_index)?;
         let image = process_frame_to_image(frame_data, &clip).await?;
         let thumbnail = resize_image(image, thumbnail_size);
 

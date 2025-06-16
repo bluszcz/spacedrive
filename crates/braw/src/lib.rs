@@ -39,7 +39,7 @@ pub use error::{BrawError, BrawResult, ErrorCategory};
 pub use metadata::BrawMetadata;
 
 #[cfg(feature = "with-sdk")]
-pub use sdk::{BrawSdk, BrawClip, validate_braw_file};
+pub use sdk::{BrawSdk, BrawClip, validate_braw_file, test_braw_file_with_sdk};
 pub use thumbnail::{
     ThumbnailSize, ThumbnailConfig,
     generate_braw_thumbnail, generate_braw_thumbnails,
@@ -53,8 +53,6 @@ pub use thumbnail::{
 use std::path::Path;
 use tokio::fs;
 use tracing::debug;
-#[cfg(feature = "with-sdk")]
-use tracing::warn;
 
 /// Magic bytes for BRAW file identification
 pub const BRAW_MAGIC_BYTES: &[u8] = b"BRAW";
@@ -126,8 +124,10 @@ impl BrawFile {
     pub async fn get_metadata(&self) -> BrawResult<BrawMetadata> {
         #[cfg(feature = "with-sdk")]
         {
-            if let Some(ref clip) = self.clip {
-                return clip.get_metadata().await;
+            if let Some(_clip) = &self.clip {
+                // For now, use basic metadata extraction even with SDK
+                // TODO: Implement proper SDK metadata extraction
+                return extract_basic_metadata(&self.path).await;
             }
         }
 
@@ -293,9 +293,7 @@ pub fn sdk_version() -> &'static str {
 /// Try to open BRAW file with SDK (internal function that can fail)
 #[cfg(feature = "with-sdk")]
 async fn try_open_with_sdk(path: &Path) -> BrawResult<sdk::BrawClip> {
-    let mut sdk = sdk::BrawSdk::new().await?;
-    let clip = sdk.open_clip(path).await?;
-    Ok(clip)
+    sdk::BrawClip::open(path.to_path_buf()).await
 }
 
 #[cfg(test)]
