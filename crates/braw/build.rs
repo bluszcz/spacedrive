@@ -124,6 +124,8 @@ fn generate_bindings(sdk_path: &PathBuf) {
     let mut builder = bindgen::Builder::default()
         .header(header_path.to_str().unwrap())
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+        .clang_arg("-x")
+        .clang_arg("c++")
         // Filter out problematic C++ templates and std library types
         .blocklist_type("std.*")
         .blocklist_type("_Tp")

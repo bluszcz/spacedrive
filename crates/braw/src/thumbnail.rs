@@ -218,13 +218,14 @@ pub async fn extract_frame_at_timestamp(
 ) -> Result<DynamicImage, BrawError> {
     debug!("Extracting frame at {}s from {}", timestamp, path.display());
 
-    let sdk = BrawSdk::new().await?;
+    let mut sdk = BrawSdk::new().await?;
     let clip = sdk.open_clip(path).await?;
 
     // Get metadata to calculate frame index
     let metadata = clip.get_metadata().await?;
     let frame_rate = metadata.frame_rate;
     let total_duration = metadata.duration_seconds;
+    let total_frames = metadata.total_frames;
 
     // Validate timestamp
     if timestamp < 0.0 || timestamp > total_duration {
@@ -256,7 +257,7 @@ pub async fn generate_filmstrip_preview(
 ) -> Result<Vec<DynamicImage>, BrawError> {
     debug!("Generating filmstrip with {} frames from {}", frame_count, path.display());
 
-    let sdk = BrawSdk::new().await?;
+    let mut sdk = BrawSdk::new().await?;
     let clip = sdk.open_clip(path).await?;
 
     let metadata = clip.get_metadata().await?;

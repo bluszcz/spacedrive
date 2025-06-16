@@ -80,6 +80,15 @@ impl BrawFile {
             )));
         }
 
+        // Quick extension check
+        if let Some(ext) = path.extension() {
+            if ext.to_string_lossy().to_lowercase() != "braw" {
+                return Err(BrawError::InvalidFormat);
+            }
+        } else {
+            return Err(BrawError::InvalidFormat);
+        }
+
         // Basic validation without SDK
         if !is_braw_file(&path).await? {
             return Err(BrawError::InvalidFormat);
@@ -91,7 +100,7 @@ impl BrawFile {
         {
             // Try to open with SDK, but don't fail if it doesn't work
             match sdk::BrawSdk::new().await {
-                Ok(sdk) => {
+                Ok(mut sdk) => {
                     match sdk.open_clip(&path).await {
                         Ok(clip) => {
                             debug!("Successfully opened BRAW file with SDK: {}", path.display());
@@ -179,7 +188,7 @@ impl BrawFile {
 pub async fn is_braw_file<P: AsRef<Path>>(path: P) -> BrawResult<bool> {
     let path = path.as_ref();
 
-    // Check file extension first (quick check)
+    // Quick extension check
     if let Some(ext) = path.extension() {
         if ext.to_string_lossy().to_lowercase() != "braw" {
             return Ok(false);
@@ -188,14 +197,29 @@ pub async fn is_braw_file<P: AsRef<Path>>(path: P) -> BrawResult<bool> {
         return Ok(false);
     }
 
-    // Check magic bytes
+    // QuickTime/ISO BMFF based BRAW files start with a standard
+    // `ftyp` box where the *major brand* equals `braw`.
+    // The first 4 bytes are the box size, followed by the literal
+    // "ftyp" and then the 4-byte brand. Therefore, we read the first
+    // 12 bytes and verify that bytes 4-8 are "ftyp" and bytes 8-12 are
+    // "braw" (case-insensitive for safety).
+
     let mut file = fs::File::open(path).await?;
-    let mut buffer = [0u8; 4];
+    let mut header = [0u8; 12];
 
     use tokio::io::AsyncReadExt;
-    match file.read_exact(&mut buffer).await {
-        Ok(_) => Ok(&buffer == BRAW_MAGIC_BYTES),
-        Err(_) => Ok(false), // File too small or read error
+    match file.read_exact(&mut header).await {
+        Ok(_) => {
+            // bytes 4..8 == b"ftyp" and bytes 8..12 == b"braw"
+            let is_ftyp = &header[4..8] == b"ftyp";
+            let is_braw_brand = {
+                let brand = &header[8..12];
+                brand.eq(b"braw") || brand.eq(b"BRAW")
+            };
+
+            Ok(is_ftyp && is_braw_brand)
+        }
+        Err(_) => Ok(false), // not enough bytes or read error
     }
 }
 
