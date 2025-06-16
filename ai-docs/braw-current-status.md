@@ -2,9 +2,9 @@
 
 ## 🚀 CURRENT DEPLOYMENT STATUS
 
-**Last Updated**: June 14 2025  
-**Status**: ✅ PRODUCTION READY  
-**Version**: Complete implementation with two-tier feature system  
+**Last Updated**: June 14 2025
+**Status**: ✅ PRODUCTION READY
+**Version**: Complete implementation with two-tier feature system
 
 ### ✅ What's Working Right Now
 
@@ -20,7 +20,7 @@
 - ✅ High-quality image processing with aspect ratio preservation
 - ✅ Non-blocking async generation (<50ms per thumbnail)
 
-#### Metadata Extraction  
+#### Metadata Extraction
 - ✅ Basic file system metadata (size, modification date, etc.)
 - ✅ Integration with Spacedrive's media metadata pipeline
 - ✅ Error handling for corrupted or inaccessible files
@@ -109,7 +109,7 @@ let thumbnails = task::spawn_blocking(move || {
 #[cfg(feature = "with-sdk")]
 pub async fn generate_braw_thumbnail(/* ... */) -> Result<DynamicImage, BrawError>
 
-#[cfg(feature = "native-ffi")]  
+#[cfg(feature = "native-ffi")]
 pub async fn extract_frame_at_timestamp(/* ... */) -> Result<Vec<u8>, BrawError>
 ```
 **Status**: ✅ Fixed
@@ -220,7 +220,7 @@ cargo run --features braw,with-sdk
 
 # What you get:
 # ✅ BRAW files detected and indexed
-# ✅ Instant gradient thumbnails  
+# ✅ Instant gradient thumbnails
 # ✅ Full Spacedrive functionality
 # ✅ No external dependencies required
 ```
@@ -317,4 +317,58 @@ The current implementation provides a solid foundation for:
 
 The modular architecture ensures the implementation will scale with future requirements while maintaining backward compatibility and system stability.
 
-**Ready for production deployment** ✅ 
+**Ready for production deployment** ✅
+
+## Latest Update: Regenerate Thumbnails Button Fix
+
+**Issue Found**: The "Regenerate Thumbs" button in LocationOptions was not working because it was missing the `regenerate: true` parameter.
+
+**Root Cause**: In `interface/app/$libraryId/location/LocationOptions.tsx`, the button was calling:
+```typescript
+regenThumbs.mutate({ id: location.id, path })
+```
+
+But it should be:
+```typescript
+regenThumbs.mutate({ id: location.id, path, regenerate: true })
+```
+
+**Fix Applied**: Updated LocationOptions.tsx to include the missing `regenerate: true` parameter.
+
+**Status**: This explains why the logs showed `regenerate_thumbnails=false` even when clicking "Regenerate Thumbs". The backend was correctly receiving `false` as the default value due to `#[serde(default)]`.
+
+## Previous BRAW File Detection Fix
+
+**Problem**: Spacedrive was generating `VideoThumbnailGenerationFailed` errors for BRAW files with message "Failed to open BRAW file: Invalid BRAW file format or corrupted file" for files like `A007_10190951_C001.braw`.
+
+**Root Cause Discovery**:
+- Analyzed actual BRAW file hex structure using hexdump:
+  ```
+  00000000  00 00 00 08 77 69 64 65  01 83 6f f8 6d 64 61 74  |....wide..o.mdat|
+  ```
+- Found BRAW files have QuickTime container structure:
+  - Bytes 0-3: size (00 00 00 08)
+  - Bytes 4-7: "wide" atom
+  - Bytes 8-11: data
+  - Bytes 12-15: "mdat" atom
+
+**Fix Applied**: Updated `is_braw_file()` function in `crates/braw/src/lib.rs` to check for correct byte positions:
+- "wide" atom at bytes 4-7
+- "mdat" atom at bytes 12-15
+
+## Current Status
+
+✅ **BRAW File Detection**: Fixed - files are now properly detected as BRAW format
+✅ **Regenerate Thumbnails Button**: Fixed - now properly passes regenerate=true parameter
+🔄 **Testing**: Ready for runtime verification
+
+**Expected Result**:
+- BRAW files should be properly detected and indexed
+- Clicking "Regenerate Thumbs" should now actually regenerate thumbnails instead of skipping them
+- No more `VideoThumbnailGenerationFailed` errors for valid BRAW files
+- BRAW thumbnails should be generated using the custom BRAW thumbnail generator
+
+**Next Steps**:
+1. Test the regenerate thumbnails functionality
+2. Verify BRAW thumbnails are generated correctly
+3. Check that BRAW files show proper video thumbnails instead of generic placeholders

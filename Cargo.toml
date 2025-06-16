@@ -153,7 +153,7 @@ opt-level   = 3
 codegen-units = 1        # Compile crates one after another so the compiler can optimize better
 lto           = true     # Enables link to optimizations
 opt-level     = "s"      # Optimize for binary size
-panic         = "unwind" # Sadly we need unwind to avoid unexpected crashes on third party crates
-strip         = true     # Remove debug symbols
+  panic         = "unwind" # Sadly we need unwind to avoid unexpected crashes on third party crates
+  strip         = true     # Remove debug symbols
 
 

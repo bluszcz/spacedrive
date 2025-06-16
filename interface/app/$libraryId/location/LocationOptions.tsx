@@ -125,7 +125,7 @@ export default function LocationOptions({ location, path }: { location: Location
 								{t('reindex')}
 							</OptionButton>
 							<OptionButton
-								onClick={() => regenThumbs.mutate({ id: location.id, path })}
+								onClick={() => regenThumbs.mutate({ id: location.id, path, regenerate: true })}
 							>
 								<Image />
 								{t('regenerate_thumbs')}

@@ -99,28 +99,21 @@ impl BrawFile {
         #[cfg(feature = "with-sdk")]
         {
             // Try to open with SDK, but don't fail if it doesn't work
-            match sdk::BrawSdk::new().await {
-                Ok(mut sdk) => {
-                    match sdk.open_clip(&path).await {
-                        Ok(clip) => {
-                            debug!("Successfully opened BRAW file with SDK: {}", path.display());
-                            return Ok(BrawFile {
-                                path,
-                                clip: Some(clip),
-                            });
-                        }
-                        Err(e) => {
-                            debug!("Failed to open BRAW clip with SDK (expected with placeholder bindings): {}, using basic mode", e);
-                        }
-                    }
+            match try_open_with_sdk(&path).await {
+                Ok(clip) => {
+                    debug!("Successfully opened BRAW file with SDK: {}", path.display());
+                    return Ok(BrawFile {
+                        path,
+                        clip: Some(clip),
+                    });
                 }
                 Err(e) => {
-                    debug!("Failed to initialize BRAW SDK (expected with placeholder bindings): {}, using basic mode", e);
+                    debug!("Failed to open BRAW clip with SDK (expected with stub implementation): {}, using basic mode", e);
                 }
             }
         }
 
-        // Always succeed in basic mode (no SDK)
+        // Always succeed in basic mode (no SDK) - this ensures thumbnail generation never fails
         debug!("Using basic mode for BRAW file: {}", path.display());
         Ok(BrawFile {
             path,
@@ -197,29 +190,52 @@ pub async fn is_braw_file<P: AsRef<Path>>(path: P) -> BrawResult<bool> {
         return Ok(false);
     }
 
-    // QuickTime/ISO BMFF based BRAW files start with a standard
-    // `ftyp` box where the *major brand* equals `braw`.
-    // The first 4 bytes are the box size, followed by the literal
-    // "ftyp" and then the 4-byte brand. Therefore, we read the first
-    // 12 bytes and verify that bytes 4-8 are "ftyp" and bytes 8-12 are
-    // "braw" (case-insensitive for safety).
+    // BRAW files are QuickTime/MP4 containers with specific structure
+    // Based on actual hex analysis:
+    // - Bytes 0-3: size (00 00 00 08)
+    // - Bytes 4-7: 'wide' atom
+    // - Bytes 8-11: some data
+    // - Bytes 12-15: 'mdat' atom
 
     let mut file = fs::File::open(path).await?;
-    let mut header = [0u8; 12];
+    let mut header = [0u8; 16];
 
     use tokio::io::AsyncReadExt;
     match file.read_exact(&mut header).await {
         Ok(_) => {
-            // bytes 4..8 == b"ftyp" and bytes 8..12 == b"braw"
+            // Check for actual BRAW file structure:
+            // - Bytes 4-7: 'wide' atom
+            // - Bytes 12-15: 'mdat' atom
+
+            let has_wide_atom = &header[4..8] == b"wide";
+            let has_mdat_atom = &header[12..16] == b"mdat";
+
+            if has_wide_atom && has_mdat_atom {
+                debug!("Detected BRAW file structure: wide + mdat atoms at correct positions");
+                return Ok(true);
+            }
+
+            // Alternative: check for 'ftyp' + 'braw' (some BRAW files might use this)
             let is_ftyp = &header[4..8] == b"ftyp";
             let is_braw_brand = {
                 let brand = &header[8..12];
                 brand.eq(b"braw") || brand.eq(b"BRAW")
             };
 
-            Ok(is_ftyp && is_braw_brand)
+            if is_ftyp && is_braw_brand {
+                debug!("Detected BRAW file structure: ftyp + braw brand");
+                return Ok(true);
+            }
+
+            // If neither pattern matches, it's likely not a BRAW file
+            debug!("File does not match expected BRAW structure - wide: {}, mdat: {}",
+                   has_wide_atom, has_mdat_atom);
+            Ok(false)
         }
-        Err(_) => Ok(false), // not enough bytes or read error
+        Err(_) => {
+            debug!("Could not read file header for BRAW detection");
+            Ok(false) // not enough bytes or read error
+        }
     }
 }
 
@@ -272,6 +288,14 @@ pub fn sdk_version() -> &'static str {
 #[cfg(not(feature = "with-sdk"))]
 pub fn sdk_version() -> &'static str {
     "BlackmagicRAW SDK not available (compile with --features with-sdk)"
+}
+
+/// Try to open BRAW file with SDK (internal function that can fail)
+#[cfg(feature = "with-sdk")]
+async fn try_open_with_sdk(path: &Path) -> BrawResult<sdk::BrawClip> {
+    let mut sdk = sdk::BrawSdk::new().await?;
+    let clip = sdk.open_clip(path).await?;
+    Ok(clip)
 }
 
 #[cfg(test)]
