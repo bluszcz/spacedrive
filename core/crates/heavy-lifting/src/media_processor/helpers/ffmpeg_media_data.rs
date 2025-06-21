@@ -76,7 +76,7 @@ pub const fn can_extract_for_audio(audio_extension: AudioExtension) -> bool {
 #[must_use]
 pub const fn can_extract_for_video(video_extension: VideoExtension) -> bool {
 	use VideoExtension::{
-		Asf, Avi, Avifs, F4v, Flv, Hevc, M2ts, M2v, M4v, Mjpeg, Mkv, Mov, Mp4, Mpe, Mpeg, Mpg, Mxf,
+		Asf, Avi, Avifs, Braw, F4v, Flv, Hevc, M2ts, M2v, M4v, Mjpeg, Mkv, Mov, Mp4, Mpe, Mpeg, Mpg, Mxf,
 		Ogv, Qt, Swf, Vob, Webm, Wm, Wmv, Wtv, _3gp,
 	};
 
@@ -94,7 +94,8 @@ pub const fn can_extract_for_video(video_extension: VideoExtension) -> bool {
 			| Mp4 | Webm
 			| Mkv | Vob
 			| Ogv | Wtv
-			| Hevc | F4v // | Ts | Mts  TODO: Uncomment when we start using magic instead of extension
+			| Hevc | F4v
+			| Braw // BRAW support via custom decoder
 	)
 }
 
@@ -102,6 +103,12 @@ pub async fn extract(
 	path: impl AsRef<Path> + Send,
 ) -> Result<FFmpegMetadata, media_processor::NonCriticalMediaProcessorError> {
 	let path = path.as_ref();
+
+	if let Some(extension) = path.extension() {
+		if extension.to_string_lossy().to_lowercase() == "braw" {
+			return super::braw_media_data::extract(path).await;
+		}
+	}
 
 	FFmpegMetadata::from_path(&path).await.map_err(|e| {
 		media_data_extractor::NonCriticalMediaDataExtractorError::FailedToExtractImageMediaData(

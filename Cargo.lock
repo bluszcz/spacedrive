@@ -10156,6 +10156,7 @@ dependencies = [
  "async-channel",
  "async-trait",
  "blake3",
+ "cc",
  "chrono",
  "futures",
  "futures-concurrency",

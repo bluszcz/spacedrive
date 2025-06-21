@@ -1,0 +1,3 @@
+export BRAW_SDK_PATH="/Applications/Blackmagic RAW/Blackmagic RAW SDK/Mac/Libraries"
+export BRAW_RUNTIME_PATH="/Applications/Blackmagic RAW"
+export DYLD_LIBRARY_PATH="/Applications/Blackmagic RAW/Blackmagic RAW SDK/Mac/Libraries:$DYLD_LIBRARY_PATH"

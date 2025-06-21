@@ -60,7 +60,7 @@ pub static THUMBNAILABLE_VIDEO_EXTENSIONS: LazyLock<Vec<Extension>> = LazyLock::
 	ALL_VIDEO_EXTENSIONS
 		.iter()
 		.copied()
-		.filter(|&ext| can_generate_thumbnail_for_video(ext))
+		.filter(|&ext| can_generate_thumbnail_for_video(ext) || ext == VideoExtension::Braw)
 		.map(Extension::Video)
 		.collect()
 });
@@ -307,7 +307,13 @@ pub async fn generate_thumbnail(
 		use sd_file_ext::extensions::VideoExtension;
 
 		if let Ok(extension) = VideoExtension::from_str(extension) {
-			if can_generate_thumbnail_for_video(extension) {
+			if extension == VideoExtension::Braw {
+				trace!("Generating BRAW thumbnail");
+				if let Err(e) = super::braw_thumbnailer::generate_braw_thumbnail(&path, &output_path).await {
+					return (start.elapsed(), Err(e));
+				}
+				trace!("Generated BRAW thumbnail");
+			} else if can_generate_thumbnail_for_video(extension) {
 				trace!("Generating video thumbnail");
 				if let Err(e) = generate_video_thumbnail(&path, &output_path).await {
 					return (start.elapsed(), Err(e));

@@ -1,3 +1,6 @@
+pub mod braw_decoder;
+pub mod braw_media_data;
+pub mod braw_thumbnailer;
 pub mod exif_media_data;
 pub mod ffmpeg_media_data;
 pub mod thumbnailer;
