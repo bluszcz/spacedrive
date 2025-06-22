@@ -105,8 +105,34 @@ pub async fn extract(
 	let path = path.as_ref();
 
 	if let Some(extension) = path.extension() {
-		if extension.to_string_lossy().to_lowercase() == "braw" {
+		let ext_lower = extension.to_string_lossy().to_lowercase();
+		
+		// Handle BRAW files
+		if ext_lower == "braw" {
 			return super::braw_media_data::extract(path).await;
+		}
+		
+		// Handle ProRes RAW files (they have .mov extension but are ProRes RAW)
+		if ext_lower == "mov" {
+			// Try FFmpeg first, if it fails with decoder error, try ProRes RAW
+			match FFmpegMetadata::from_path(&path).await {
+				Ok(metadata) => return Ok(metadata),
+				Err(e) => {
+					let error_str = e.to_string();
+					// Check if it's a decoder not found error for ProRes RAW
+					if error_str.contains("Decoder not found") || error_str.contains("unknown codec") {
+						// Try ProRes RAW decoder
+						if let Ok(prores_metadata) = super::prores_raw_media_data::extract(path).await {
+							return Ok(prores_metadata);
+						}
+					}
+					// If not ProRes RAW or ProRes RAW failed, return original error
+					return Err(media_data_extractor::NonCriticalMediaDataExtractorError::FailedToExtractImageMediaData(
+						path.to_path_buf(),
+						error_str,
+					).into());
+				}
+			}
 		}
 	}
 

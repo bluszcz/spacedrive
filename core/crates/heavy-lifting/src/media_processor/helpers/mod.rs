@@ -3,6 +3,9 @@ pub mod braw_media_data;
 pub mod braw_thumbnailer;
 pub mod exif_media_data;
 pub mod ffmpeg_media_data;
+pub mod prores_raw_decoder;
+pub mod prores_raw_media_data;
+pub mod prores_raw_thumbnailer;
 pub mod thumbnailer;
 
 #[must_use]

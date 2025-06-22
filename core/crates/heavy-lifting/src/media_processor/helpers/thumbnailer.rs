@@ -313,6 +313,25 @@ pub async fn generate_thumbnail(
 					return (start.elapsed(), Err(e));
 				}
 				trace!("Generated BRAW thumbnail");
+			} else if extension == VideoExtension::Mov {
+				// Check if this is a ProRes RAW file by trying to probe it
+				if super::prores_raw_decoder::extract_first_frame(&path).await.is_ok() {
+					trace!("Generating ProRes RAW thumbnail");
+					if let Err(e) = super::prores_raw_thumbnailer::generate_prores_raw_thumbnail(&path, &output_path).await {
+						// If ProRes RAW fails, fall back to regular video thumbnail
+						trace!("ProRes RAW thumbnail failed, falling back to video thumbnail");
+						if let Err(e) = generate_video_thumbnail(&path, &output_path).await {
+							return (start.elapsed(), Err(e));
+						}
+					}
+					trace!("Generated ProRes RAW thumbnail");
+				} else if can_generate_thumbnail_for_video(extension) {
+					trace!("Generating video thumbnail for MOV");
+					if let Err(e) = generate_video_thumbnail(&path, &output_path).await {
+						return (start.elapsed(), Err(e));
+					}
+					trace!("Generated video thumbnail");
+				}
 			} else if can_generate_thumbnail_for_video(extension) {
 				trace!("Generating video thumbnail");
 				if let Err(e) = generate_video_thumbnail(&path, &output_path).await {
