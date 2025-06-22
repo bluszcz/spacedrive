@@ -1,222 +1,117 @@
-# Spacedrive Compilation Guide
+# Spacedrive Compilation Features Analysis
 
-## Overview
+## Network/Cloud/P2P Features That Can Be Disabled
 
-Spacedrive uses a modular compilation system with feature flags to optimize builds for different platforms and use cases. Like a Viking longship with removable parts, you can enable/disable features based on your needs.
+### Core Features (from core/Cargo.toml)
+- **`ffmpeg`** - Controls FFmpeg-based media processing functionality
+- **`ai`** - Controls AI model functionality (depends on `sd-ai` crate)
+- **`mobile`** - Special mobile compilation mode that may affect networking features
+- **`heif`** - HEIF image format support
 
-## Core Features
+### Desktop App Features (from apps/desktop/src-tauri/Cargo.toml)
+- **`ai-models`** - Enables AI model functionality (maps to `sd-core/ai`)
+- **`custom-protocol`** - Tauri custom protocol support (default enabled)
+- **`devtools`** - Development tools support
 
-### Media Processing Features
+### Server App Features (from apps/server/Cargo.toml)
+- **`ai-models`** - Enables AI model functionality (maps to `sd-core/ai`)
+- **`assets`** - Asset serving functionality
 
-#### FFmpeg Support
+### Mobile Compilation (apps/mobile/modules/sd-core/core/Cargo.toml)
+Mobile builds use `default-features = false` and only enable:
+- `mobile`
+- `ffmpeg` 
+- `heif` (iOS only)
+
+## Networking/Cloud Components (Always Compiled)
+
+### Cloud Services (core/crates/cloud-services/)
+- **Always compiled** - No feature flags found
+- Contains P2P networking functionality via `iroh` crate
+- Includes sync, client, and P2P runner modules
+- Uses QUIC/RPC transport layer
+
+### P2P System (crates/old-p2p/)
+- **Always compiled** - No optional compilation found
+- Uses libp2p with features: autonat, dcutr, macros, noise, quic, relay, serde, tokio, yamux
+- Includes block transfer, protocol definitions, and tunneling
+
+### Sync System (crates/sync/ and core/crates/sync/)
+- **Always compiled** - No feature flags to disable
+- Core synchronization functionality between nodes
+
+## Key Dependencies That Cannot Be Disabled
+
+1. **libp2p** - Peer-to-peer networking library (always included)
+2. **iroh** - QUIC-based networking stack (always included in cloud services)
+3. **quic-rpc** - RPC over QUIC protocol (always included)
+4. **sd-cloud-schema** - Cloud services schema (workspace dependency)
+
+## Minimal Build Considerations
+
+For truly minimal builds wanting to exclude networking:
+- Mobile builds already use `default-features = false` but still include cloud services
+- No current feature flags exist to completely disable P2P or cloud functionality
+- The Node structure hardcodes `cloud_services` and `p2p` managers
+- All networking dependencies are workspace-level dependencies
+
+## Current Architecture Limitations
+
+The current architecture does not support completely network-free builds because:
+1. Core Node struct requires CloudServices and P2PManager instances
+2. No conditional compilation around networking modules
+3. Workspace dependencies include networking crates unconditionally
+
+To create truly offline/minimal builds, significant refactoring would be needed to make networking components optional at the architectural level.
+
+## Media Processing Build Scenarios
+
+### Three Critical Build Cases
+
+#### Case 1: Standard Build (No BRAW, No ProRes RAW)
 ```bash
-# Enable FFmpeg for video processing (default for desktop)
-cargo build --features ffmpeg
-
-# Disable FFmpeg for lighter builds
-cargo build
+# Basic build with FFmpeg support only
+cargo build --features="ffmpeg,heif"
+# Supports: Standard video formats via FFmpeg, images
+# Missing: BRAW files, ProRes RAW files will fail with FFmpeg errors
 ```
 
-#### HEIF Image Support
+#### Case 2: BRAW Support (macOS with SDK)
 ```bash
-# Enable modern HEIF/HEIC image format support
-cargo build --features heif
-```
-
-#### BRAW Support (macOS only)
-```bash
-# Requires Blackmagic RAW SDK installation
+# Requires Blackmagic RAW SDK at /Applications/Blackmagic RAW/
 ./setup-braw-build.sh
-source .braw-env && cargo build
+source .braw-env && cargo build --features="ffmpeg,heif"
+# Supports: BRAW files + standard formats
+# Note: ProRes RAW still fails without VideoToolbox integration
 ```
 
-### AI/ML Features
+#### Case 3: ProRes RAW Support (macOS VideoToolbox)
 ```bash
-# Enable AI features for object recognition, etc.
-cargo build --features ai
+# Uses native VideoToolbox APIs (no external SDK needed)
+cargo build --features="ffmpeg,heif"  # ProRes RAW automatically enabled on macOS
+# Supports: ProRes RAW files + standard formats via VideoToolbox
+# Note: BRAW files not supported without SDK
 ```
 
-### Platform-Specific Builds
-
-#### Desktop (Full Features)
+#### Case 4: Full Media Support (Both BRAW + ProRes RAW)
 ```bash
-# macOS/Windows/Linux with all features
-cargo build --bin sd-desktop --features "ffmpeg,heif"
+# macOS with both BRAW SDK and ProRes RAW support
+./setup-braw-build.sh
+source .braw-env && cargo build --features="ffmpeg,heif"
+# Supports: BRAW files, ProRes RAW files, all FFmpeg formats
 ```
 
-#### Server (Headless)
-```bash
-# Minimal server build without GUI dependencies
-cargo build --bin sd-server
-```
+## ProRes RAW Integration Details
 
-#### Mobile
-```bash
-# iOS build (requires Xcode)
-cargo build --target aarch64-apple-ios --features mobile
+### Technical Implementation
+- **Detection**: Uses `ffprobe` to identify `aprn` codec tag
+- **Processing**: Bypasses FFmpeg entirely, uses `AVAssetImageGenerator`
+- **Thumbnails**: Extracts frames at `kCMTimeZero`, converts to WebP
+- **Fallback**: Falls back to FFmpeg for non-ProRes RAW MOV files
 
-# Android build (requires NDK)
-cargo build --target aarch64-linux-android --features mobile
-```
-
-## Build Profiles
-
-### Development (Fast compilation)
-```bash
-cargo build
-```
-
-### Release (Optimized)
-```bash
-cargo build --release
-```
-
-### Size-Optimized
-```bash
-RUSTFLAGS="-C opt-level=z" cargo build --release
-```
-
-## Platform-Specific Configuration
-
-### macOS
-- **Metal GPU acceleration**: Automatically enabled
-- **BRAW support**: Requires SDK installation
-- **HEIF support**: Native via frameworks
-
-### Windows
-- **DirectML AI**: Automatically enabled when available
-- **Windows-specific file operations**: Enabled via conditional compilation
-
-### Linux
-- **XNNPACK AI**: Used for AI inference
-- **System integration**: Varies by distribution
-
-## Feature Combinations
-
-### Minimal Build (Server)
-```bash
-cargo build --bin sd-server --no-default-features
-```
-
-### Full Desktop Build
-```bash
-cargo build --bin sd-desktop --features "ffmpeg,heif,ai"
-```
-
-### Development Build with BRAW
-```bash
-source .braw-env && cargo build --features "ffmpeg,heif"
-```
-
-## Cross-Compilation
-
-### iOS
-```bash
-rustup target add aarch64-apple-ios
-cargo build --target aarch64-apple-ios --features mobile
-```
-
-### Android
-```bash
-rustup target add aarch64-linux-android
-cargo build --target aarch64-linux-android --features mobile
-```
-
-### ARM64 Linux
-```bash
-rustup target add aarch64-unknown-linux-gnu
-cargo build --target aarch64-unknown-linux-gnu
-```
-
-## Build Dependencies
-
-### Core Dependencies (Always Required)
-- Rust 1.81+
-- Basic system libraries
-
-### Optional Dependencies
-- **FFmpeg**: For video processing (`ffmpeg` feature)
-- **HEIF libraries**: For HEIF support (`heif` feature)  
-- **Blackmagic RAW SDK**: For BRAW support (macOS)
-- **GPU libraries**: Metal (macOS), DirectML (Windows), Vulkan (Linux)
-
-## Optimization Flags
-
-### Link-Time Optimization
-```bash
-RUSTFLAGS="-C lto=fat" cargo build --release
-```
-
-### CPU-Specific Optimization
-```bash
-RUSTFLAGS="-C target-cpu=native" cargo build --release
-```
-
-### Debug Information
-```bash
-# Include debug info in release
-cargo build --release --config profile.release.debug=true
-```
-
-## Troubleshooting
-
-### Build Failures
-1. **Missing dependencies**: Install platform-specific libraries
-2. **Feature conflicts**: Check feature combinations
-3. **Outdated Rust**: Update to latest stable
-
-### Performance Issues
-1. **Use release builds**: `cargo build --release`
-2. **Enable LTO**: Add link-time optimization
-3. **Platform optimization**: Use native CPU features
-
-### Platform-Specific Issues
-- **macOS**: Ensure Xcode command line tools installed
-- **Windows**: Install Visual Studio Build Tools
-- **Linux**: Install development packages (libssl-dev, etc.)
-
-## Quick Start Scripts
-
-### Desktop Development
-```bash
-./start.sh  # Builds and runs with all desktop features
-```
-
-### Server Deployment
-```bash
-cargo build --release --bin sd-server
-```
-
-### Cross-Platform Build
-```bash
-# Build for all platforms
-cargo build --release --bin sd-desktop --target x86_64-pc-windows-gnu
-cargo build --release --bin sd-desktop --target x86_64-apple-darwin
-cargo build --release --bin sd-desktop --target x86_64-unknown-linux-gnu
-```
-
-## Advanced Configuration
-
-### Custom Feature Sets
-Create `.cargo/config.toml`:
-```toml
-[build]
-target-dir = "target"
-
-[profile.release]
-opt-level = 3
-lto = true
-codegen-units = 1
-panic = "abort"
-```
-
-### Environment Variables
-```bash
-# Optimize for size
-export RUSTFLAGS="-C opt-level=z -C target-cpu=native"
-
-# Link statically
-export RUSTFLAGS="-C target-feature=+crt-static"
-```
-
-This modular approach ensures you only compile what you need, keeping builds fast and binaries lean!
+### Files Modified for ProRes RAW Support
+- `core/crates/heavy-lifting/wrapper_prores_raw.cpp` - VideoToolbox C++ wrapper
+- `core/crates/heavy-lifting/src/media_processor/helpers/prores_raw_decoder.rs` - Rust FFI
+- `core/crates/heavy-lifting/src/media_processor/helpers/prores_raw_thumbnailer.rs` - Thumbnail generation
+- `core/crates/heavy-lifting/src/media_processor/helpers/thumbnailer.rs` - Integration logic
+- `core/crates/heavy-lifting/build.rs` - VideoToolbox framework linking
