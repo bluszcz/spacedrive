@@ -84,7 +84,7 @@ pub async fn extract_frame_from_prores_raw(
             free_frame_data(data);
         }
 
-        // Ensure we have the right amount of data (RGBA = 4 bytes per pixel)
+        // Ensure we have the right amount of data (BGRA/RGBA = 4 bytes per pixel)
         let expected_size = (width as usize) * (height as usize) * 4;
         if data_size != expected_size {
             error!(
@@ -97,8 +97,15 @@ pub async fn extract_frame_from_prores_raw(
             )));
         }
 
-        // Create RGBA image from raw data
-        let rgba_image = ImageBuffer::<Rgba<u8>, _>::from_raw(width as u32, height as u32, data_vec)
+        // Convert BGRA to RGBA if needed (VideoToolbox typically returns BGRA)
+        let mut rgba_data = data_vec;
+        for chunk in rgba_data.chunks_exact_mut(4) {
+            // Swap B and R channels: BGRA -> RGBA
+            chunk.swap(0, 2);
+        }
+
+        // Create RGBA image from converted data
+        let rgba_image = ImageBuffer::<Rgba<u8>, _>::from_raw(width as u32, height as u32, rgba_data)
             .ok_or_else(|| {
                 ProResRawError::ImageError("Failed to create image from raw data".to_string())
             })?;
@@ -111,4 +118,37 @@ pub async fn extract_frame_from_prores_raw(
 
 pub async fn extract_first_frame(path: impl AsRef<Path>) -> Result<RgbaImage, ProResRawError> {
     extract_frame_from_prores_raw(path, 0).await
+}
+
+/// Lightweight check to see if a MOV file contains ProRes RAW without extracting frames
+pub async fn is_prores_raw_file(path: impl AsRef<Path>) -> bool {
+    let path_string = match path.as_ref().to_str() {
+        Some(s) => s.to_string(),
+        None => return false,
+    };
+    
+    // Use ffprobe to quickly check codec without extracting frames
+    let output = task::spawn_blocking(move || {
+        std::process::Command::new("ffprobe")
+            .args(&[
+                "-v", "quiet",
+                "-print_format", "json", 
+                "-show_streams",
+                "-select_streams", "v:0",
+                &path_string
+            ])
+            .output()
+    }).await;
+    
+    if let Ok(Ok(output)) = output {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            // Check for ProRes RAW specific indicators
+            return stdout.contains("aprn") || 
+                   stdout.contains("Apple ProRes RAW") ||
+                   (stdout.contains("codec_tag_string") && stdout.contains("\"aprn\""));
+        }
+    }
+    
+    false
 }

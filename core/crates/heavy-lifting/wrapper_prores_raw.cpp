@@ -3,6 +3,8 @@
 #include <VideoToolbox/VideoToolbox.h>
 #include <CoreVideo/CoreVideo.h>
 #include <CoreMedia/CoreMedia.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <ImageIO/ImageIO.h>
 #include <iostream>
 #include <cstring>
 
@@ -17,6 +19,8 @@ int extract_prores_raw_frame(
     size_t* data_size
 ) {
     @autoreleasepool {
+        std::cerr << "🎯 ProRes RAW: Starting frame extraction with AVAssetImageGenerator" << std::endl;
+        
         // Convert C string to NSString
         NSString* filePath = [NSString stringWithUTF8String:file_path];
         NSURL* fileURL = [NSURL fileURLWithPath:filePath];
@@ -24,132 +28,109 @@ int extract_prores_raw_frame(
         // Create AVAsset
         AVAsset* asset = [AVAsset assetWithURL:fileURL];
         if (!asset) {
-            std::cerr << "Failed to create AVAsset from file: " << file_path << std::endl;
+            std::cerr << "❌ Failed to create AVAsset from file: " << file_path << std::endl;
             return -1;
         }
         
-        // Get video tracks
-        NSArray<AVAssetTrack*>* videoTracks = [asset tracksWithMediaType:AVMediaTypeVideo];
-        if (videoTracks.count == 0) {
-            std::cerr << "No video tracks found in file: " << file_path << std::endl;
+        std::cerr << "✅ Created AVAsset successfully" << std::endl;
+        
+        // Create AVAssetImageGenerator - this is Apple's dedicated thumbnail API
+        AVAssetImageGenerator* imageGenerator = [AVAssetImageGenerator assetImageGeneratorWithAsset:asset];
+        if (!imageGenerator) {
+            std::cerr << "❌ Failed to create AVAssetImageGenerator" << std::endl;
             return -2;
         }
         
-        AVAssetTrack* videoTrack = videoTracks[0];
-        CGSize naturalSize = videoTrack.naturalSize;
+        // Configure the image generator for high quality
+        imageGenerator.appliesPreferredTrackTransform = YES;
+        imageGenerator.maximumSize = CGSizeMake(4096, 4096); // High quality for ProRes RAW
+        imageGenerator.requestedTimeToleranceBefore = kCMTimeZero;
+        imageGenerator.requestedTimeToleranceAfter = kCMTimeZero;
         
-        *width = (int)naturalSize.width;
-        *height = (int)naturalSize.height;
+        std::cerr << "✅ Configured AVAssetImageGenerator for ProRes RAW" << std::endl;
         
-        // Create asset reader
+        // Generate thumbnail at time zero (first frame)
         NSError* error = nil;
-        AVAssetReader* reader = [[AVAssetReader alloc] initWithAsset:asset error:&error];
-        if (!reader || error) {
-            std::cerr << "Failed to create AVAssetReader: " << error.localizedDescription.UTF8String << std::endl;
+        CMTime requestedTime = CMTimeMake(frame_number, 25); // Assume 25fps, adjust as needed
+        if (frame_number == 0) {
+            requestedTime = kCMTimeZero;
+        }
+        
+        std::cerr << "🎯 Extracting frame " << frame_number << " using AVAssetImageGenerator..." << std::endl;
+        
+        CGImageRef imageRef = [imageGenerator copyCGImageAtTime:requestedTime 
+                                                     actualTime:NULL 
+                                                          error:&error];
+        
+        if (!imageRef) {
+            if (error) {
+                std::cerr << "❌ AVAssetImageGenerator failed: " << error.localizedDescription.UTF8String << std::endl;
+            } else {
+                std::cerr << "❌ AVAssetImageGenerator returned nil image" << std::endl;
+            }
             return -3;
         }
         
-        // Create output settings for RGBA format
-        NSDictionary* outputSettings = @{
-            (NSString*)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32RGBA)
-        };
+        std::cerr << "✅ Successfully extracted CGImage from ProRes RAW!" << std::endl;
         
-        // Create asset reader output
-        AVAssetReaderTrackOutput* readerOutput = [[AVAssetReaderTrackOutput alloc] 
-                                                   initWithTrack:videoTrack 
-                                                   outputSettings:outputSettings];
+        // Get image dimensions
+        size_t imageWidth = CGImageGetWidth(imageRef);
+        size_t imageHeight = CGImageGetHeight(imageRef);
+        *width = (int)imageWidth;
+        *height = (int)imageHeight;
         
-        if (![reader canAddOutput:readerOutput]) {
-            std::cerr << "Cannot add reader output" << std::endl;
+        std::cerr << "📐 Image dimensions: " << imageWidth << "x" << imageHeight << std::endl;
+        
+        // Create a bitmap context to extract RGBA data
+        size_t bytesPerPixel = 4; // RGBA
+        size_t bytesPerRow = imageWidth * bytesPerPixel;
+        *data_size = imageHeight * bytesPerRow;
+        
+        // Allocate memory for the pixel data
+        *data = (unsigned char*)malloc(*data_size);
+        if (!*data) {
+            std::cerr << "❌ Failed to allocate memory for pixel data" << std::endl;
+            CGImageRelease(imageRef);
             return -4;
         }
         
-        [reader addOutput:readerOutput];
-        
-        // Start reading
-        if (![reader startReading]) {
-            std::cerr << "Failed to start reading" << std::endl;
+        // Create color space and bitmap context
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        if (!colorSpace) {
+            std::cerr << "❌ Failed to create RGB color space" << std::endl;
+            free(*data);
+            CGImageRelease(imageRef);
             return -5;
         }
         
-        // Skip to desired frame
-        int currentFrame = 0;
-        CMSampleBufferRef sampleBuffer = nil;
+        CGContextRef context = CGBitmapContextCreate(*data, 
+                                                    imageWidth, 
+                                                    imageHeight, 
+                                                    8, // bits per component
+                                                    bytesPerRow, 
+                                                    colorSpace,
+                                                    kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
         
-        while (currentFrame <= frame_number) {
-            sampleBuffer = [readerOutput copyNextSampleBuffer];
-            if (!sampleBuffer) {
-                std::cerr << "Failed to get sample buffer for frame " << currentFrame << std::endl;
-                return -6;
-            }
-            
-            if (currentFrame == frame_number) {
-                break;
-            }
-            
-            CFRelease(sampleBuffer);
-            currentFrame++;
+        CGColorSpaceRelease(colorSpace);
+        
+        if (!context) {
+            std::cerr << "❌ Failed to create bitmap context" << std::endl;
+            free(*data);
+            CGImageRelease(imageRef);
+            return -6;
         }
         
-        if (!sampleBuffer) {
-            std::cerr << "No sample buffer for frame " << frame_number << std::endl;
-            return -7;
-        }
+        // Draw the CGImage into our bitmap context to get RGBA pixel data
+        CGContextDrawImage(context, CGRectMake(0, 0, imageWidth, imageHeight), imageRef);
         
-        // Get CVImageBuffer from sample buffer
-        CVImageBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
-        if (!imageBuffer) {
-            std::cerr << "Failed to get image buffer" << std::endl;
-            CFRelease(sampleBuffer);
-            return -8;
-        }
-        
-        // Lock the pixel buffer
-        OSType pixelFormat = CVPixelBufferGetPixelFormatType(imageBuffer);
-        if (pixelFormat != kCVPixelFormatType_32RGBA) {
-            std::cerr << "Unexpected pixel format: " << pixelFormat << std::endl;
-            CFRelease(sampleBuffer);
-            return -9;
-        }
-        
-        CVPixelBufferLockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
-        
-        // Get pixel data
-        void* baseAddress = CVPixelBufferGetBaseAddress(imageBuffer);
-        size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
-        size_t bufferHeight = CVPixelBufferGetHeight(imageBuffer);
-        size_t bufferWidth = CVPixelBufferGetWidth(imageBuffer);
-        
-        // Calculate expected data size (RGBA = 4 bytes per pixel)
-        *data_size = bufferWidth * bufferHeight * 4;
-        
-        // Allocate memory for the output data
-        *data = (unsigned char*)malloc(*data_size);
-        if (!*data) {
-            std::cerr << "Failed to allocate memory for frame data" << std::endl;
-            CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
-            CFRelease(sampleBuffer);
-            return -10;
-        }
-        
-        // Copy pixel data row by row (handling potential padding)
-        unsigned char* src = (unsigned char*)baseAddress;
-        unsigned char* dst = *data;
-        size_t rowSize = bufferWidth * 4; // 4 bytes per pixel (RGBA)
-        
-        for (size_t row = 0; row < bufferHeight; row++) {
-            memcpy(dst + (row * rowSize), src + (row * bytesPerRow), rowSize);
-        }
-        
-        // Update actual dimensions
-        *width = (int)bufferWidth;
-        *height = (int)bufferHeight;
+        std::cerr << "✅ Successfully converted ProRes RAW to RGBA pixel data!" << std::endl;
         
         // Cleanup
-        CVPixelBufferUnlockBaseAddress(imageBuffer, kCVPixelBufferLock_ReadOnly);
-        CFRelease(sampleBuffer);
+        CGContextRelease(context);
+        CGImageRelease(imageRef);
         
-        return 0; // Success
+        std::cerr << "🎉 ProRes RAW frame extraction completed successfully!" << std::endl;
+        return 0; // Success!
     }
 }
 

@@ -61,6 +61,10 @@ static_assertions = "1.1"
 [build-dependencies]
 cc = "1.0"
 
+[[bin]]
+name = "test_prores_integration"
+path = "test_prores_integration.rs"
+
 [dev-dependencies]
 tempfile     = { workspace = true }
 tracing-test = { workspace = true }

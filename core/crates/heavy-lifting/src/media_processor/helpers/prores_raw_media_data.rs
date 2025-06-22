@@ -17,7 +17,7 @@ use std::{collections::HashMap, path::Path};
 pub async fn extract(
     path: impl AsRef<Path> + Send,
 ) -> Result<FFmpegMetadata, media_processor::NonCriticalMediaProcessorError> {
-    let path = path.as_ref();
+    let _path = path.as_ref();
 
     // For ProRes RAW, we'll create minimal metadata compatible with FFmpeg schema
     // since we can't extract full metadata like we do with BRAW

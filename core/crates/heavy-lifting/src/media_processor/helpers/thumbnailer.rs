@@ -314,23 +314,25 @@ pub async fn generate_thumbnail(
 				}
 				trace!("Generated BRAW thumbnail");
 			} else if extension == VideoExtension::Mov {
-				// Check if this is a ProRes RAW file by trying to probe it
-				if super::prores_raw_decoder::extract_first_frame(&path).await.is_ok() {
-					trace!("Generating ProRes RAW thumbnail");
+				// Check if this is a ProRes RAW file using lightweight detection
+				trace!("Detected MOV file, checking if it's ProRes RAW: {}", path.display());
+				if super::prores_raw_decoder::is_prores_raw_file(&path).await {
+					trace!("✓ Detected ProRes RAW file, using VideoToolbox decoder");
 					if let Err(e) = super::prores_raw_thumbnailer::generate_prores_raw_thumbnail(&path, &output_path).await {
 						// If ProRes RAW fails, fall back to regular video thumbnail
-						trace!("ProRes RAW thumbnail failed, falling back to video thumbnail");
+						trace!("⚠ ProRes RAW thumbnail failed: {}, falling back to FFmpeg", e);
 						if let Err(e) = generate_video_thumbnail(&path, &output_path).await {
 							return (start.elapsed(), Err(e));
 						}
+					} else {
+						trace!("✓ Generated ProRes RAW thumbnail successfully");
 					}
-					trace!("Generated ProRes RAW thumbnail");
 				} else if can_generate_thumbnail_for_video(extension) {
-					trace!("Generating video thumbnail for MOV");
+					trace!("Regular MOV file, using FFmpeg decoder");
 					if let Err(e) = generate_video_thumbnail(&path, &output_path).await {
 						return (start.elapsed(), Err(e));
 					}
-					trace!("Generated video thumbnail");
+					trace!("Generated FFmpeg video thumbnail");
 				}
 			} else if can_generate_thumbnail_for_video(extension) {
 				trace!("Generating video thumbnail");
