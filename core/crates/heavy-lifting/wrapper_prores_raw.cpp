@@ -58,9 +58,25 @@ int extract_prores_raw_frame(
         
         std::cerr << "🎯 Extracting frame " << frame_number << " using AVAssetImageGenerator..." << std::endl;
         
-        CGImageRef imageRef = [imageGenerator copyCGImageAtTime:requestedTime 
-                                                     actualTime:NULL 
-                                                          error:&error];
+        // Use modern async API wrapped in synchronous dispatch
+        __block CGImageRef imageRef = NULL;
+        __block NSError* blockError = nil;
+        dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
+        
+        [imageGenerator generateCGImageAsynchronouslyForTime:requestedTime completionHandler:^(CGImageRef _Nullable image, CMTime /* actualTime */, NSError * _Nullable error) {
+            imageRef = image;
+            if (imageRef) {
+                CGImageRetain(imageRef); // Retain the image since it will be used outside the block
+            }
+            blockError = error;
+            dispatch_semaphore_signal(semaphore);
+        }];
+        
+        // Wait for completion
+        dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+        dispatch_release(semaphore);
+        
+        error = blockError;
         
         if (!imageRef) {
             if (error) {

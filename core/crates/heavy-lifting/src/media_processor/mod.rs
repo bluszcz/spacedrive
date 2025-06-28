@@ -25,6 +25,8 @@ pub use tasks::{
 
 pub use helpers::{
 	exif_media_data, ffmpeg_media_data,
+	prores_raw_decoder,
+	prores_raw_thumbnailer,
 	thumbnailer::{
 		can_generate_thumbnail_for_document, can_generate_thumbnail_for_image,
 		generate_single_thumbnail, get_shard_hex, get_thumbnails_directory, GenerateThumbnailArgs,

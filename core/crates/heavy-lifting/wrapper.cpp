@@ -70,7 +70,7 @@ static FrameCallback g_frame_callback;
 extern "C" {
 
 // Factory functions
-void* create_blackmagic_raw_factory_instance_from_path(const char* path) {
+void* create_blackmagic_raw_factory_instance_from_path(const char* /* path */) {
     // Use basic factory instance since FromPath version isn't exported
     IBlackmagicRawFactory* factory = CreateBlackmagicRawFactoryInstance();
     return factory;
@@ -82,7 +82,7 @@ long blackmagic_raw_factory_create_codec(void* factory_ptr, void** codec_ptr) {
     return factory->CreateCodec(codec);
 }
 
-long blackmagic_raw_set_callback(void* codec_ptr, void* callback_ptr) {
+long blackmagic_raw_set_callback(void* codec_ptr, void* /* callback_ptr */) {
     IBlackmagicRaw* codec = static_cast<IBlackmagicRaw*>(codec_ptr);
     return codec->SetCallback(&g_frame_callback);
 }
@@ -162,7 +162,7 @@ long blackmagic_raw_job_submit(void* job_ptr) {
 
 // Frame reading functions
 
-long blackmagic_raw_job_set_callback(void* job_ptr, void* callback_ptr) {
+long blackmagic_raw_job_set_callback(void* /* job_ptr */, void* /* callback_ptr */) {
     // IBlackmagicRawJob doesn't have SetCallback - this is handled at codec level
     // For now, return success - the callback is already set at a higher level
     return 0; // S_OK

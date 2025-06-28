@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Test detection first
     println!("Testing ProRes RAW detection...");
-    let is_prores_raw = sd_core_heavy_lifting::media_processor::helpers::prores_raw_decoder::is_prores_raw_file(&prores_raw_file).await;
+    let is_prores_raw = sd_core_heavy_lifting::media_processor::prores_raw_decoder::is_prores_raw_file(&prores_raw_file).await;
     println!("ProRes RAW detected: {}", is_prores_raw);
     
     if is_prores_raw {
@@ -21,14 +21,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         // Test frame extraction
         println!("Testing frame extraction...");
-        match sd_core_heavy_lifting::media_processor::helpers::prores_raw_decoder::extract_first_frame(&prores_raw_file).await {
+        match sd_core_heavy_lifting::media_processor::prores_raw_decoder::extract_first_frame(&prores_raw_file).await {
             Ok(image) => {
                 println!("✅ Successfully extracted frame! Dimensions: {}x{}", image.width(), image.height());
                 
                 // Test thumbnail generation
                 println!("Testing thumbnail generation...");
                 let output_path = "/tmp/prores_raw_test_thumb.webp";
-                match sd_core_heavy_lifting::media_processor::helpers::prores_raw_thumbnailer::generate_prores_raw_thumbnail(&prores_raw_file, output_path).await {
+                match sd_core_heavy_lifting::media_processor::prores_raw_thumbnailer::generate_prores_raw_thumbnail(&prores_raw_file, output_path).await {
                     Ok(_) => {
                         println!("✅ Successfully generated ProRes RAW thumbnail at: {}", output_path);
                         if Path::new(output_path).exists() {
